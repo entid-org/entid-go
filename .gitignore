@@ -1,0 +1,8 @@
+# Build output. The engine ships as source; binaries are built, never committed.
+/bin/
+/dist/
+*.test
+*.out
+
+# Fuzz corpora Go writes when a target finds a new input. Seeds that matter are
+# checked in under testdata/fuzz; the cache is not.

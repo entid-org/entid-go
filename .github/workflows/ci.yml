@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Verify the bundle against rules.lock
+        run: |
+          declared=$(grep '^rules_sha256' rules.lock | cut -d'"' -f2)
+          actual=$(sha256sum spec/businessid-rules.binpb | cut -d' ' -f1)
+          if [ "$declared" != "$actual" ]; then
+            echo "bundle digest $actual does not match the $declared declared in rules.lock" >&2
+            exit 1
+          fi
+
+      - name: Check that the generated rules are up to date
+        run: |
+          go generate ./...
+          git diff --exit-code -- rules_gen.go
+
+      - name: Format
+        run: |
+          gofmt -l . | tee /tmp/unformatted
+          test ! -s /tmp/unformatted
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Fuzz smoke tests
+        run: |
+          go test ./internal/gen -run FuzzLoad -fuzz FuzzLoad -fuzztime 30s
+          go test . -run FuzzValidate -fuzz FuzzValidate -fuzztime 30s
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
