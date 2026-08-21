@@ -14,6 +14,7 @@ const (
 	MaxConstantBytes     = 4096
 	MaxInputBytes        = 1024
 	MaxCapturesPerFormat = 128
+	MaxSteps             = 100000
 	MaxRulesVersionBytes = 64
 	MaxAlphabetPoints    = 256
 )

@@ -45,7 +45,7 @@ arrêter l’implémentation, ouvrir un défaut dans `spec` et ne pas choisir ar
 une interprétation. Le code Go de l’interpréteur de référence n’est jamais une source
 normative et ne doit pas être copié.
 
-## 1.1 Générateur, pas interpréteur
+## 1.2 Générateur, pas interpréteur
 
 Un moteur NE DOIT PAS interpréter le bundle à l’exécution. Le travail se sépare en
 deux :
@@ -580,44 +580,72 @@ produit format `unsupported`/`input_too_long` et checksum `not_run` : la limite 
 sécurité ne constitue pas à elle seule une preuve métier d’invalidité. Les moteurs
 peuvent choisir une limite interne plus haute, jamais plus basse.
 
-## 10. Registre : interface seulement
+## 10. Registre : différé, mais sa place est réservée
 
-Chaque langage prévoit une abstraction idiomatique équivalente à :
+La consultation d'un registre distant n'est **pas** dans cette version. Un moteur V1
+valide le format et le checksum, localement, et rien d'autre. Aucun moteur ne doit
+livrer `RegistryProvider`, et un moteur qui ne le livre pas est pleinement conforme.
 
-```text
-RegistryProvider
-  supports(kind, countryCode) -> Boolean
-  lookup(canonicalIdentifier, context) -> RegistryResult ou erreur technique
-```
+Ce qui est décidé maintenant, ce n'est pas l'interface : c'est la place qu'elle
+occupera, pour qu'elle puisse arriver sans casser une API publique déjà figée par
+SemVer.
 
-`RegistryResult` prévoit au minimum :
+### 10.1 Ce qui ne bougera pas
 
-```text
-status:
-  found
-  not_found
-  inactive
-  unsupported
-  temporarily_unavailable
+Trois propriétés sont arrêtées dès maintenant, parce que les changer plus tard serait
+une rupture :
 
-providerId
-checkedAt
-canonicalValue
-reasonCode
-metadata optionnelle
-```
+- **La validation locale reste synchrone, définitivement.** `canonicalize`, `validate`,
+  `validateFormat` et `validateChecksum` ne deviendront jamais asynchrones. Une
+  consultation de registre est une opération distincte, asynchrone, jamais un mode de
+  celles-ci. C'est la propriété la plus structurante : la rompre transformerait chaque
+  appelant.
+- **`validate` n'appellera jamais un registre.** Le niveau registre n'entre pas dans
+  `ValidationReport` par un champ que `validate` remplirait ; il arrivera comme un
+  rapport distinct, produit par une opération distincte.
+- **`registry_not_configured` existe déjà** dans le registre des `ReasonCode` et y
+  reste. Il n'a pas d'usage en V1 ; il est réservé.
 
-Contraintes V1 :
+### 10.2 La contrainte qui décide de la forme
 
-- aucun provider concret livré ;
-- aucun appel registre depuis `validate` ;
-- sans provider configuré : `registry_not_configured` ;
-- l’interface peut être asynchrone selon le langage ;
-- timeout, transport et authentification sont des erreurs distinctes de `not_found` ;
-- une indisponibilité ne doit jamais devenir `invalid`.
+Une consultation de registre porte un jeton d'API. **Un moteur ne doit jamais rendre
+cette consultation possible depuis un navigateur** : le jeton y serait exposé à
+quiconque ouvre les outils de développement, et aucune précaution d'implémentation ne
+répare cela.
 
-Les APIs registre peuvent rester marquées expérimentales jusqu’à leur spécification
-complète, mais les types doivent être conçus sans dépendance HTTP imposée.
+La conséquence est une exigence de packaging, pas de style :
+
+- le cœur, qui valide format et checksum, reste utilisable partout, navigateur
+  compris ;
+- tout ce qui consulte un registre vit dans un **module ou paquet séparé**, qui ne
+  s'installe et ne se charge que dans un contexte serveur ;
+- pour un langage qui cible les deux, comme TypeScript, cela signifie un point
+  d'entrée d'export distinct, absent du bundle navigateur, et non un drapeau
+  d'exécution.
+
+### 10.3 Disponibilité variable, conformité identique
+
+Le registre pourra exister dans un langage et pas dans un autre, et cela ne crée pas
+deux niveaux de conformité. La conformité se mesure sur le corpus, qui ne contient que
+des opérations locales : un moteur sans registre passe les mêmes cas qu'un moteur qui
+en a un.
+
+Un langage qui ne cible que le serveur pourra donc le proposer avant les autres, et un
+langage qui cible le navigateur pourra ne l'offrir que dans son point d'entrée serveur.
+
+### 10.4 Ce qu'un moteur V1 doit faire
+
+Rien, sinon ne pas se fermer la porte :
+
+- n'exposez aucun type de registre, même expérimental — un type public est un
+  engagement ;
+- ne rendez aucune méthode de validation asynchrone « au cas où » ;
+- ne mettez aucune dépendance HTTP dans le paquet du cœur.
+
+L'interface elle-même — `RegistryProvider`, les statuts d'un résultat, la distinction
+entre indisponibilité et absence — sera spécifiée quand elle sera construite. Une
+indisponibilité ne devra jamais devenir `invalid`, mais cette règle se formulera avec
+le reste.
 
 ## 11. Conformité commune
 

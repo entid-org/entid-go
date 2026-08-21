@@ -75,6 +75,23 @@ bounds below are what its generator enforces instead. An engine that walks the
 IR at validation time applies the budget as written. Section 2.4 of the
 specification binds observable results, never the strategy that produces them.
 
+A generator that inlines an operand where the graph reads it more than once
+must bound what it emits, and the budget above is that bound: a generated
+program may hold at most 100000 operation instances, counted after inlining.
+
+The bound is not a formality. The node count of a program is bounded, but
+the graph is a DAG, and a DAG whose every node reads the previous one twice
+expands exponentially while passing all twenty four load checks. Without a
+bound, such a bundle is a denial of service against the generator rather
+than against the engine, and the twenty four checks would not see it.
+
+Choosing the budget rather than a new number is deliberate: a generated
+program may not carry more instances than an interpreter would have taken
+steps to run it once. A generator that shares a repeated operand instead of
+inlining it stays free to do so, provided the sharing preserves the short
+circuit of `ALL`, `ANY` and of the assertion sequence, which stop at the
+first decisive operand.
+
 ### 2.1 Calls
 
 `CALL_OP_KIND_FORMAT` runs a format program with the operand as its subject and
@@ -1238,17 +1255,18 @@ An engine performs these checks, in this order, before executing anything:
 11. operand count, operand types and strictly lower operand indices
 12. only the parameters the operation declares, and every required parameter
 13. arithmetic bounds: moduli, weights, remainder tables, indices, provable integer widths and the alphabet of a custom mapping
-14. root, subject and capture nodes inside the program and correctly typed
-15. program shape: accepted root per kind, `WHEN` only inside `CHOOSE`, and a pre-canonicalization program restricted to its five permitted operations
-16. identifier ids unique, kinds and countries well formed, serialization order respected
-17. exactly one checksum program or one absence reason per definition
-18. dispatcher kinds and aliases globally unique, sorted, and never ambiguous
-19. country aliases sorted, unique, never self mapping and never shadowing a target
-20. targets sorted, unique per country, prefixes claimed by at most one target
-21. GLOBAL targets alone, without prefix and without country alias
-22. every definition referenced by exactly one dispatch target
-23. call graph acyclic, typed and of static depth at most 32
-24. no capability used without being declared
+14. expansion within the evaluation budget once repeated operands are inlined
+15. root, subject and capture nodes inside the program and correctly typed
+16. program shape: accepted root per kind, `WHEN` only inside `CHOOSE`, and a pre-canonicalization program restricted to its five permitted operations
+17. identifier ids unique, kinds and countries well formed, serialization order respected
+18. exactly one checksum program or one absence reason per definition
+19. dispatcher kinds and aliases globally unique, sorted, and never ambiguous
+20. country aliases sorted, unique, never self mapping and never shadowing a target
+21. targets sorted, unique per country, prefixes claimed by at most one target
+22. GLOBAL targets alone, without prefix and without country alias
+23. every definition referenced by exactly one dispatch target
+24. call graph acyclic, typed and of static depth at most 32
+25. no capability used without being declared
 
 A size, structural, arithmetic or graph violation is `invalid_ruleset`. An
 unsupported `format_version` and an unknown capability id are

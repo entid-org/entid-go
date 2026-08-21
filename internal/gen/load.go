@@ -264,7 +264,17 @@ func (v *validator) checkProgram(p *Program) error {
 		bounds[i] = stringBound(n, bounds)
 	}
 
-	// 14. root, subject and capture nodes inside the program and correctly typed
+	// 14. expansion within the evaluation budget once repeated operands are
+	// inlined. Check 15 is what proves the root is inside the program, so a
+	// root out of range is left for it to name.
+	if int(p.RootNode) < len(p.Nodes) {
+		if n := expansionOf(p); n > MaxSteps {
+			return invalidf("program %d expands to %s operation instances once repeated operands are inlined, the budget is %d",
+				p.ID, describeExpansion(n), MaxSteps)
+		}
+	}
+
+	// 15. root, subject and capture nodes inside the program and correctly typed
 	if int(p.RootNode) >= len(p.Nodes) {
 		return invalidf("program %d has root node %d outside its %d nodes", p.ID, p.RootNode, len(p.Nodes))
 	}
@@ -1128,4 +1138,58 @@ func checkAlphabet(alphabet string, has bool) error {
 		return fmt.Errorf("the custom alphabet holds %d code points, the limit is %d", count, MaxAlphabetPoints)
 	}
 	return nil
+}
+
+// expansionOf counts the operation instances a generated program holds once
+// every repeated operand is inlined: one per path from the root to a node,
+// which is 1 + the sum over the operands.
+//
+// The node count of a program is bounded and its graph is acyclic, but a DAG
+// whose every node reads the previous one twice doubles at each level, so the
+// result is counted with saturating arithmetic. An int64 would overflow into a
+// small number that passes, which is the shape of the attack rather than an
+// edge case.
+//
+// A call counts as one instance: the callee is a program of its own, emitted
+// once and reached through a function call, so it is counted under its own id.
+//
+// The roots of the emission are the root node and every capture, since a
+// generator that materializes a capture emits its subtree too. A node no root
+// reaches is emitted by nobody and counts for nothing.
+func expansionOf(p *Program) int64 {
+	instances := make([]int64, len(p.Nodes))
+	for i, n := range p.Nodes {
+		// Operand indices are strictly lower, which check 11 proved, so every
+		// operand already holds its count.
+		total := int64(1)
+		for _, in := range n.InputNodes {
+			total = saturatingAdd(total, instances[in])
+		}
+		instances[i] = total
+	}
+	total := instances[p.RootNode]
+	for _, c := range p.Captures {
+		if int(c.Node) < len(p.Nodes) {
+			total = saturatingAdd(total, instances[c.Node])
+		}
+	}
+	return total
+}
+
+// saturatingAdd stops at one past the budget rather than wrapping. Anything
+// above the budget is refused, so the exact value beyond it carries no meaning.
+func saturatingAdd(a, b int64) int64 {
+	const ceiling = int64(MaxSteps) + 1
+	if a >= ceiling || b >= ceiling || a > ceiling-b {
+		return ceiling
+	}
+	return a + b
+}
+
+// describeExpansion renders a count the saturating walk may have capped.
+func describeExpansion(n int64) string {
+	if n > MaxSteps {
+		return fmt.Sprintf("more than %d", MaxSteps)
+	}
+	return fmt.Sprintf("%d", n)
 }

@@ -14,7 +14,7 @@ contrainte Go rend l’API proposée impossible : dans ce cas, documente l’éc
 préserve la sémantique sérialisée commune.
 
 Le moteur ne lit pas le bundle à l'exécution : un générateur le lit à la construction
-et émet du code, comme l'exige `engine.md` section 1.1. Il n'existe donc aucune
+et émet du code, comme l'exige `engine.md` section 1.2. Il n'existe donc aucune
 fabrique publique acceptant un bundle en octets, et un jeu de règles personnalisé
 passe par le générateur.
 
@@ -26,13 +26,17 @@ port ligne à ligne d’un autre moteur.
 
 La bibliothèque doit :
 
-- embarquer `businessid-rules.binpb` ;
-- décoder et valider défensivement l’IR Protobuf ;
-- exécuter canonicalisation, format et checksum ;
-- passer intégralement `businessid-conformance.binpb` ;
+- générer, à la construction, le code des canonicalisations, formats et checksums à
+  partir de `businessid-rules.binpb` ;
+- décoder et valider défensivement l’IR Protobuf **dans le générateur**, en appliquant
+  les vingt-quatre contrôles de `ir.md` section 10 et en refusant d’émettre du code
+  si l’un échoue ;
+- exécuter canonicalisation, format et checksum depuis le code généré, sans décodeur
+  ni machine d’exécution de l’IR dans la bibliothèque publiée ;
+- passer intégralement `businessid-conformance.binpb` ; le testee répond aux cas
+  `load_ruleset` en appelant le générateur, comme le dit le champ 7 de
+  `testee.proto` ;
 - exposer les versions moteur/règles/format et capabilities ;
-- permettre de construire un moteur depuis des bytes personnalisés ;
-- définir l’interface de registre, sans provider concret ni dépendance HTTP ;
 - être sûre en concurrence ;
 - ne jamais panic sur une entrée utilisateur ou un bundle non fiable.
 
@@ -59,24 +63,24 @@ Structure recommandée :
 ├── errors.go
 ├── engine.go
 ├── options.go
+├── rules_gen.go           # code généré depuis le bundle, jamais édité
 ├── internal/
-│   ├── irpb/              # code Protobuf généré
-│   ├── rules/
-│   ├── runtime/
+│   ├── runtime/           # primitives que le code généré appelle
 │   ├── canonicalize/
 │   ├── checksum/
 │   └── limits/
-├── assets/
-│   └── businessid-rules.binpb
-├── conformance/
-│   └── businessid-conformance.binpb
+├── cmd/businessid-gen/    # le générateur : lit le bundle, valide, émet rules_gen.go
 ├── cmd/businessid-example/
 └── integration/
 ```
 
-Adapte la structure si une alternative est plus idiomatique, mais conserve une
-séparation nette entre API domaine, décodage Protobuf, validation du bundle et
-interpréteur.
+Le générateur et la bibliothèque sont deux programmes. Le décodage Protobuf, les
+vingt-quatre contrôles de chargement et la connaissance des opcodes vivent dans le
+générateur ; la bibliothèque publiée ne contient que le code émis, les primitives
+qu'il appelle et l'API. Aucun `.binpb` n'est compilé dans le paquet.
+
+Adapte la structure si une alternative est plus idiomatique, mais conserve cette
+séparation : ce qui lit le bundle ne doit pas être ce qui est livré.
 
 ## API Go attendue
 
@@ -121,24 +125,24 @@ Une erreur de bundle embarqué est un défaut de build ; elle doit être exposé
 façon testable sans rendre les entrées utilisateur panics. Une fonction
 `DefaultEngine() (*Engine, error)` peut être préférée si elle rend le contrat plus sûr.
 
-## Interface registre
+### Registre : rien à livrer en V1
 
-Définir une interface idiomatique avec `context.Context` :
+Ce moteur n'expose aucun type de registre. `engine.md` section 10 diffère la
+consultation d'un registre distant à une version ultérieure, et un moteur qui n'en
+porte pas est pleinement conforme.
 
-```go
-type RegistryProvider interface {
-    Supports(kind IdentifierKind, countryCode string) bool
-    Lookup(ctx context.Context, input RegistryInput) (RegistryResult, error)
-}
-```
+Trois choses à ne pas faire, parce qu'elles fermeraient la porte :
 
-- aucun provider concret ;
-- aucun client HTTP dans le module cœur ;
-- contexte en premier paramètre ;
-- distinguer résultat métier et erreur de transport future ;
-- ne pas stocker de `context.Context` dans une struct ;
-- `Validate` ne reçoit pas de contexte car il est purement local, sauf justification
-  API documentée.
+- n'exposez aucun type de registre, même marqué expérimental : un type public est un
+  engagement que SemVer fige ;
+- ne rendez aucune méthode de validation asynchrone « au cas où » — la validation
+  locale reste synchrone définitivement ;
+- ne mettez aucune dépendance HTTP dans le paquet du cœur.
+
+Une consultation de registre porte un jeton d'API : elle ne devra jamais être possible
+depuis un navigateur, et vivra donc dans un module séparé, chargé côté serveur
+uniquement.
+
 
 ## Protobuf et artefacts
 
@@ -147,7 +151,9 @@ type RegistryProvider interface {
 - Verrouiller les versions de `protoc`, `protoc-gen-go` ou utiliser Buf selon la CI.
 - Commettre le code généré si cela rend le build consommateur indépendant des outils.
 - Ajouter une commande `make generate` et `make check-generated`.
-- Embarquer le bundle officiel avec `//go:embed`.
+- Ne pas embarquer le bundle : ce qui est compilé dans la bibliothèque est le code
+  généré à partir de lui. Le `.binpb` est une entrée du générateur, pas une donnée du
+  paquet publié.
 - Vérifier les hashes lors du workflow de mise à jour ; ne pas resérialiser Protobuf
   pour vérifier l’intégrité.
 - Le runtime ne parse jamais HCL ou JSONL.
@@ -221,7 +227,7 @@ Quality gates :
 - mutation testing périodique avec un outil maintenu, score cœur recommandé ≥ 80 %.
 
 Les fichiers `.pb.go` générés peuvent être exclus du calcul de couverture, pas le
-validateur de bundle ni l’interpréteur.
+validateur de bundle du générateur, ni les primitives que le code émis appelle.
 
 ## CI GitHub Actions
 
@@ -252,7 +258,6 @@ Le README doit montrer :
 - interprétation de `unsupported` ;
 - versions des règles ;
 - construction depuis bytes ;
-- interface registre sans implémentation ;
 - limites : format/checksum ne prouvent pas l’existence.
 
 Ajouter `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`, changelog et exemples. Préparer
@@ -275,7 +280,6 @@ les tags SemVer. Vérifier `go list`, `go test` et documentation pkg.go.dev.
 - API et runtime ;
 - code Protobuf généré et reproductible ;
 - bundle et conformité verrouillés ;
-- interface registre ;
 - tests, fuzzers, benchmarks ;
 - CI et release ;
 - documentation et exemples ;

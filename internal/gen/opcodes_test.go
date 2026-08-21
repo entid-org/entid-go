@@ -659,3 +659,62 @@ func TestUnknownOperationIsAVersionGapWhenDeclared(t *testing.T) {
 		}
 	})
 }
+
+// doublingProgram builds a format program whose every string node reads the
+// previous one twice. The node count stays tiny and the graph stays acyclic, so
+// checks 8 to 13 see nothing; the number of instances a generator emits doubles
+// at each level.
+//
+// With c(0) = 1 for the subject, c(k) = 1 + 2*c(k-1), so c(k) = 2^(k+1) - 1.
+func doublingProgram(id uint32, levels int) prog {
+	nodes := []node{sn(sSubject, nil)}
+	for k := 1; k <= levels; k++ {
+		prev := uint32(k - 1)
+		nodes = append(nodes, sn(sConcat, []uint32{prev, prev}))
+	}
+	last := uint32(levels)
+	nodes = append(nodes,
+		pr(pIsAbsent, []uint32{last}),
+		pr(pNot, []uint32{uint32(levels + 1)}),
+		as(aRequire, []uint32{uint32(levels + 2)}, reason(rcInvalidFormat)),
+		as(aSeq, []uint32{uint32(levels + 3)}),
+	)
+	return prog{id: id, kind: kFormat, root: uint32(levels + 4), nodes: nodes}
+}
+
+// TestExpansionBudget covers check 14. A DAG whose every node reads the previous
+// one twice expands exponentially while passing every other check, which is a
+// denial of service against the generator rather than against the engine.
+//
+// The bound is the evaluation budget rather than a new number: a generated
+// program may not carry more instances than an interpreter would have taken
+// steps to run it once.
+func TestExpansionBudget(t *testing.T) {
+	// c(15) = 65535 instances for the chain, plus the four nodes above it.
+	// c(16) = 131071, past the 100000 budget.
+	t.Run("within the budget", func(t *testing.T) {
+		raw := allOpcodesBundle()
+		raw.programs[1] = doublingProgram(2, 15)
+		if _, err := gen.Load(raw.encode()); err != nil {
+			t.Fatalf("65539 instances are within the budget: %v", err)
+		}
+	})
+
+	t.Run("past the budget", func(t *testing.T) {
+		raw := allOpcodesBundle()
+		raw.programs[1] = doublingProgram(2, 16)
+		if _, err := gen.Load(raw.encode()); !errors.Is(err, gen.ErrInvalidRuleset) {
+			t.Fatalf("got %v, want invalid_ruleset", err)
+		}
+	})
+
+	t.Run("a chain no counter could hold", func(t *testing.T) {
+		// 200 levels is 2^201 instances: the count must saturate rather than
+		// overflow into a small number that passes.
+		raw := allOpcodesBundle()
+		raw.programs[1] = doublingProgram(2, 200)
+		if _, err := gen.Load(raw.encode()); !errors.Is(err, gen.ErrInvalidRuleset) {
+			t.Fatalf("got %v, want invalid_ruleset", err)
+		}
+	})
+}
