@@ -84,6 +84,11 @@ message ObservedValidationReport {
 message ObservedStep {
   libbusinessid.conformance.v1.StepStatus status = 1;
   libbusinessid.ir.v1.ReasonCode reason_code = 2;
+  // The message key the rule carries, absent when the result was produced
+  // before any rule assertion. engine.md section 11.2 states that the common
+  // tests compare the code and the key; without this field they compared only
+  // the code, and an engine could emit any key at all without a case noticing.
+  optional string message_key = 3;
 }
 
 // ObservedLoad is the outcome of submitting a bundle to the engine or to its

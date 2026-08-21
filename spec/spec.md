@@ -71,9 +71,18 @@ Le refus est une propriété du temps de génération, jamais du temps d’exéc
 moteur généré ne rencontre par construction aucune construction qu’il ne comprend
 pas, puisque tout ce qu’il contient a été produit à partir d’un bundle accepté.
 
-Un moteur qui choisirait néanmoins d’interpréter le bundle à l’exécution reste
-conforme s’il produit les mêmes résultats observables, et applique alors la même
-règle de refus au chargement.
+Un moteur NE DOIT PAS interpréter le bundle à l’exécution. Le bundle est lu par le
+générateur, au moment de la construction, et ce qui est livré est le code produit.
+Cette phrase remplace une tolérance antérieure qui autorisait l’interprétation à
+condition de produire les mêmes résultats : elle contredisait `PROVENANCE.md`, laissait
+`engine.md` muet sur le sujet, et un moteur l’a suivie de bonne foi jusqu’à livrer un
+interpréteur complet.
+
+La raison n’est pas l’uniformité pour elle-même. Un interpréteur porte à l’exécution,
+chez chaque appelant, le validateur complet des vingt-quatre contrôles et la machine
+d’exécution de soixante-trois opcodes — soit une surface d’attaque et un coût que le
+générateur paie une fois, à la construction, et que le code livré ne porte plus. Le
+refus reste une propriété du temps de génération.
 
 ### 2.4 Déterminisme observable
 
@@ -650,10 +659,10 @@ L’algorithme de dispatch normatif est :
 
 1. normaliser le kind par trim ASCII, lowercase ASCII et table d’alias ;
 2. si le kind est inconnu, retourner `unsupported_kind` sans exécuter de programme ;
-3. normaliser le pays explicite par uppercase ASCII et table d’alias ; un pays
+3. exécuter une fois le pré-canonicalizer sur la valeur brute ;
+4. normaliser le pays explicite par uppercase ASCII et table d’alias ; un pays
    syntaxiquement invalide retourne `unsupported_country` ; pour un dispatcher
    country-specific, un pays sans cible retourne aussi `unsupported_country` ;
-4. exécuter une fois le pré-canonicalizer sur la valeur brute ;
 5. chercher le plus long `accepted_prefix` exact ; une même valeur ne peut appartenir
    à deux cibles et les préfixes qui se recouvrent sont départagés par la longueur ;
 6. si pays explicite et préfixe désignent deux cibles différentes, retourner
@@ -664,6 +673,11 @@ L’algorithme de dispatch normatif est :
 8. si aucune cible n’est sélectionnable, retourner `missing_country_code` ;
 9. exécuter le canonicalizer spécifique de la définition sélectionnée sur la valeur
    pré-canonique, exactement une fois.
+
+L’ordre des étapes 3 et 4 est observable : la pré-canonicalisation précède la décision
+de pays, donc un pays inutilisable est rapporté avec la valeur déjà pré-canonique. Ce
+document et `engine.md` les donnaient dans l’ordre inverse de `ir.md` section 5, qui
+fait foi ; aucun cas du corpus ne distinguait les deux.
 
 Un dispatcher `GLOBAL` possède exactement cette unique cible et ne peut pas mélanger
 cible globale et cibles pays. Sa cible n’a aucun préfixe ; un contexte pays bien
@@ -930,24 +944,10 @@ pour faciliter le debug et couverte par un test d’équivalence.
 publie la liste des fonctionnalités supportées. Le chargement échoue si un seul ID
 est inconnu.
 
-Registre initial des capabilities exactes et immuables V1 :
-
-| ID | Nom | Contenu |
-|---:|---|---|
-| 1 | `CORE_GRAPH_V1` | programmes, nœuds topologiques, valeurs typées |
-| 2 | `ASCII_AND_WHITESPACE_V1` | classes ASCII et table whitespace figée |
-| 3 | `CANONICALIZATION_BASIC_V1` | trim, uppercase, remove, prefix, pad, insert |
-| 4 | `CANONICALIZATION_CONDITIONAL_V1` | `when` et prédicats sur valeur courante |
-| 5 | `IDENTIFIER_DISPATCH_V1` | kind/pays/préfixes, alias séparés et sélection en deux phases |
-| 10 | `STRING_VIEWS_V1` | slice, before/after, concat, absence |
-| 11 | `CAPTURES_AND_CALLS_V1` | captures et réutilisation de programmes |
-| 20 | `FORMAT_ASSERTIONS_V1` | prédicats et assertions ordonnées |
-| 21 | `PROFILES_V1` | compatible et strict_current |
-| 30 | `CHECKSUM_TRISTATE_V1` | valid, invalid, unsupported et branchement |
-| 31 | `CHECKSUM_LUHN_V1` | Luhn |
-| 32 | `CHECKSUM_MOD97_V1` | ISO 7064 / modulo 97 |
-| 33 | `CHECKSUM_WEIGHTED_V1` | sommes pondérées, alignements et restes |
-| 40 | `PROVENANCE_V1` | sources liées aux définitions |
+Le registre des capabilities est publié par `docs/features.md`, généré depuis le
+registre Go unique. Il n’est pas recopié ici : une table tenue à la main dérive, et
+celle qui occupait cette place s’était arrêtée à quatorze IDs alors que le bundle en
+portait dix-huit.
 
 Chaque ID désigne l’ensemble exact et figé d’opérations, champs, bornes et sémantiques
 documenté dans `docs/features.md`. Cet ensemble ne peut jamais être élargi ou
@@ -1149,6 +1149,7 @@ registry_not_configured
 incompatible_ruleset
 invalid_ruleset
 input_too_long
+invalid_encoding
 ```
 
 `valid` exige `ok`. `not_run` exige `not_requested`,

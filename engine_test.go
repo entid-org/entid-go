@@ -404,3 +404,98 @@ func luhnHolds(digits string) bool {
 	}
 	return sum%10 == 0
 }
+
+// TestPreCanonicalizationPrecedesTheCountryDecision covers step 4 of section 5
+// of ir.md: the pre-canonicalizer runs as soon as the dispatcher resolves, so a
+// result that stops at the country decision still reports the pre-canonical
+// value. engine.md and spec.md stated the opposite order until 2026.08.14, and
+// an engine that followed either reports the raw value here.
+//
+// Step 3 is the boundary: an unresolved kind returns before any program runs,
+// so that one alone reports the value verbatim.
+func TestPreCanonicalizationPrecedesTheCountryDecision(t *testing.T) {
+	engine := businessid.New()
+	// Dirty enough that the pre-canonicalizer must have run for the reported
+	// value to differ: leading and inner whitespace, lower case, punctuation.
+	const dirty = "  be 0123.456-749  "
+	const pre = "BE0123456749"
+
+	for _, tc := range []struct {
+		name    string
+		in      businessid.Input
+		want    string
+		status  businessid.Status
+		reason  businessid.Reason
+		country string
+	}{
+		{
+			// Section 5.1: with no definition selected the report carries the
+			// normalized country when one exists, and this token normalizes to
+			// nothing, so the raw context stands.
+			name:    "a country token that is not two letters",
+			in:      businessid.Input{Kind: "vat", Value: dirty, CountryCode: "belgium"},
+			want:    pre,
+			status:  businessid.Unsupported,
+			reason:  businessid.ReasonUnsupportedCountry,
+			country: "belgium",
+		},
+		{
+			name:    "a well formed country the dispatcher has no target for",
+			in:      businessid.Input{Kind: "vat", Value: dirty, CountryCode: "ZZ"},
+			want:    pre,
+			status:  businessid.Unsupported,
+			reason:  businessid.ReasonUnsupportedCountry,
+			country: "ZZ",
+		},
+		{
+			name:    "a country contradicting the prefix",
+			in:      businessid.Input{Kind: "vat", Value: dirty, CountryCode: "fr"},
+			want:    pre,
+			status:  businessid.Invalid,
+			reason:  businessid.ReasonCountryMismatch,
+			country: "FR",
+		},
+		{
+			name:   "no country and no prefix to select on",
+			in:     businessid.Input{Kind: "vat", Value: "  0123.456-749  "},
+			want:   "0123456749",
+			status: businessid.Unsupported,
+			reason: businessid.ReasonMissingCountryCode,
+		},
+		{
+			// Step 3 precedes step 4: no dispatcher, so no program ran and
+			// the value is reported exactly as it was submitted.
+			name:   "an unresolved kind stops before any program",
+			in:     businessid.Input{Kind: "not-an-identifier", Value: dirty},
+			want:   dirty,
+			status: businessid.Unsupported,
+			reason: businessid.ReasonUnsupportedKind,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := engine.Validate(tc.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.CanonicalValue != tc.want {
+				t.Errorf("value %q, want %q", report.CanonicalValue, tc.want)
+			}
+			if report.Format.Status != tc.status || report.Format.Reason != tc.reason {
+				t.Errorf("format %s %s, want %s %s",
+					report.Format.Status, report.Format.Reason, tc.status, tc.reason)
+			}
+			if report.CountryCode != tc.country {
+				t.Errorf("country %q, want %q", report.CountryCode, tc.country)
+			}
+			// Canonicalize answers the same question through another entry
+			// point, and must not disagree about the value.
+			canonical, err := engine.Canonicalize(tc.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if canonical.CanonicalValue != tc.want {
+				t.Errorf("Canonicalize returned %q, want %q", canonical.CanonicalValue, tc.want)
+			}
+		})
+	}
+}

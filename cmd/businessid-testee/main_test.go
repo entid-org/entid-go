@@ -405,3 +405,90 @@ func TestInvalidEncodingIsObserved(t *testing.T) {
 		t.Fatalf("format reason %d, want invalid_encoding", got)
 	}
 }
+
+// TestMessageKeyCrossesTheProtocol covers field 3 of ObservedStep. Section 11.2
+// of engine.md states that the common tests compare the reason code and the
+// message key; until the field existed they compared only the code, and an
+// engine could emit any key at all without a case noticing.
+//
+// The key is filled from the rule that produced the result, and stays absent
+// when the result precedes every assertion.
+func TestMessageKeyCrossesTheProtocol(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		req  requestOf
+		// want is the key expected on the format step, empty meaning the
+		// field must not be present at all.
+		want string
+	}{
+		{
+			// A length assertion of the SIREN rule, which names a key.
+			name: "an assertion that names a key",
+			req:  requestOf{caseID: "k-1", operation: opValidate, kind: "siren", input: "0123"},
+			want: "fr.siren.length",
+		},
+		{
+			// An EUID applies the national rule, so the key reported is the
+			// national one rather than an EUID specific restatement.
+			name: "a key that comes from a called rule",
+			req:  requestOf{caseID: "k-2", operation: opValidate, kind: "euid", input: "BE0400.9123456744"},
+			want: "be.enterprise_number.leading",
+		},
+		{
+			name: "a valid format asserts nothing",
+			req:  requestOf{caseID: "k-3", operation: opValidate, kind: "vat", input: "BE0123456749"},
+		},
+		{
+			name: "an unresolved kind precedes every rule",
+			req:  requestOf{caseID: "k-4", operation: opValidate, kind: "not-an-identifier", input: "X"},
+		},
+		{
+			name: "a dispatch failure precedes every rule",
+			req:  requestOf{caseID: "k-5", operation: opValidate, kind: "vat", input: "0123456749"},
+		},
+		{
+			name: "a value above the byte limit is refused before any rule",
+			req:  requestOf{caseID: "k-6", operation: opValidate, kind: "vat", input: strings.Repeat("9", 1025)},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := exchange(t, tc.req)
+			report := fields(t, resp[3])
+			format := fields(t, report[4])
+			key, present := format[3]
+			if tc.want == "" {
+				if present {
+					t.Fatalf("the format step carries the key %q, none was expected", key)
+				}
+				return
+			}
+			if !present {
+				t.Fatalf("the format step carries no message key, %q was expected", tc.want)
+			}
+			if string(key) != tc.want {
+				t.Fatalf("message key %q, want %q", key, tc.want)
+			}
+		})
+	}
+}
+
+// TestChecksumStepReportsItsKey covers the other step: a checksum rule may name
+// a key too, and a step that never ran must not invent one.
+func TestChecksumStepReportsItsKey(t *testing.T) {
+	// A format that did not hold leaves the checksum not_run, which is a
+	// result no rule produced.
+	resp := exchange(t, requestOf{caseID: "k-7", operation: opValidate, kind: "siren", input: "0123"})
+	report := fields(t, resp[3])
+	checksum := fields(t, report[5])
+	if key, present := checksum[3]; present {
+		t.Fatalf("a checksum that never ran carries the key %q", key)
+	}
+
+	// validate_format leaves the checksum not_requested, likewise.
+	resp = exchange(t, requestOf{caseID: "k-8", operation: opValidateFormat, kind: "vat", input: "BE0123456749"})
+	report = fields(t, resp[3])
+	checksum = fields(t, report[5])
+	if key, present := checksum[3]; present {
+		t.Fatalf("a checksum that was not requested carries the key %q", key)
+	}
+}

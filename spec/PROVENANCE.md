@@ -1,8 +1,8 @@
 # Where these files come from, and what to build
 
 Copied from `github.com/libbusinessid/spec` at commit
-`85a9547d2b9803e5fab90a135ae01f5c46f3bdf1`, rules version `2026.08.14`,
-stability `alpha`.
+`3295dc0d26914a3b2e778a5620ab0e5cf1f7e8c9`, rules version
+`2026.08.14`, stability `alpha`.
 
 ## What this engine is — and is not
 
@@ -19,8 +19,8 @@ The generator is not in the spec repository and never will be — the
 specification stays agnostic and hosts no target language. Write it in whatever
 language suits you, as long as it can read the bundle.
 
-The reasoning, if you want it: all business logic of the seven current
-definitions is 185 IR nodes using 45 of the 61 opcodes. An interpreter costs
+The reasoning, if you want it: all business logic of the 94 current
+definitions is 2375 IR nodes using 52 of the 63 opcodes. An interpreter costs
 roughly three thousand lines of execution machinery per language to run that,
 and buys the ability to swap rules without recompiling — which this project
 does not use, since section 3 excludes dynamic rule downloading and section 11
@@ -32,7 +32,7 @@ requires a republication of the engine for every rules version.
 |---|---|
 | `spec/spec.md` | The normative specification. It governs. |
 | `spec/ir.md` | The 61 opcodes, their operands and their semantics. |
-| `spec/features.md` | The 14 frozen capability IDs. |
+| `spec/features.md` | The 18 frozen capability IDs. |
 | `spec/rules.proto` | Schema of the rules bundle — the generator's input. |
 | `spec/conformance.proto` | Schema of the conformance corpus. |
 | `spec/businessid-rules.binpb` | The bundle to generate from. |
@@ -111,6 +111,7 @@ cases address the engine through the protocol above.
 Every digest in `rules.lock` is a SHA-256 of the corresponding file. Verify them
 before starting. `rules.lock` carries no `attestation_identity` because no
 release exists yet; its header explains this.
+
 
 ## Language-specific traps
 

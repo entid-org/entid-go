@@ -284,7 +284,16 @@ func encodeReport(caseID string, got businessid.Report) []byte {
 
 func encodeStep(s businessid.Step) []byte {
 	body := appendVarint(nil, 1, uint64(s.Status))
-	return appendVarint(body, 2, uint64(s.Reason))
+	body = appendVarint(body, 2, uint64(s.Reason))
+	// Field 3 carries the key the rule names, and stays absent when the
+	// result precedes every assertion: a dispatch outcome, a safety bound, or
+	// a step that did not run. Section 11.2 of engine.md compares the key
+	// alongside the reason code, so an absent one has to mean "no rule spoke"
+	// rather than "the engine did not say".
+	if s.MessageKey != "" {
+		body = appendString(body, 3, s.MessageKey)
+	}
+	return body
 }
 
 // encodeLoad reports what the generator made of a bundle. A hostile bundle must
