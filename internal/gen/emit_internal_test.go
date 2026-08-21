@@ -147,3 +147,47 @@ func TestExpansionCountsTheSubjectNode(t *testing.T) {
 		})
 	}
 }
+
+// TestExpansionIgnoresTheCaptureOrder covers the last decision of check 14. A
+// capture may be reached by another capture, not only by the program root, and
+// walking the list in its declared order then makes the count depend on how the
+// captures happen to be listed — which is not a property of the bundle.
+//
+// Taking them from the highest index down settles it in one pass: an operand
+// always sits at a lower index than the node reading it, so a capture reached by
+// another is always seen after the one reaching it.
+func TestExpansionIgnoresTheCaptureOrder(t *testing.T) {
+	// n0 subject, n1 = f(n0) the root. n2 = f(n0) and n3 = f(n2) are reached by
+	// no root but their own captures, and n3 reads n2.
+	program := func(captures ...uint32) *Program {
+		p := &Program{
+			ID: 1, Kind: ProgramFormat, RootNode: 1,
+			Nodes: []*Node{
+				{Op: OpSubject, OutputType: ValueString},
+				{Op: OpSliceFrom, OutputType: ValueString, InputNodes: []uint32{0}},
+				{Op: OpSliceTo, OutputType: ValueString, InputNodes: []uint32{0}},
+				{Op: OpConcat, OutputType: ValueString, InputNodes: []uint32{2, 2}},
+			},
+		}
+		for i, c := range captures {
+			p.Captures = append(p.Captures, Capture{Name: string(rune('a' + i)), Node: c})
+		}
+		return p
+	}
+
+	// The root costs 2. n3 costs 1 + 2*2 = 5 and contains n2, so the two
+	// captures together add 5 whichever way round they are listed.
+	const want = 2 + 5
+	for _, order := range [][]uint32{{2, 3}, {3, 2}} {
+		got := expansionOf(program(order...))
+		if got != want {
+			t.Errorf("captures listed as %v give %d instances, want %d", order, got, want)
+		}
+	}
+
+	// The same shape once more, with the reaching capture listed first and the
+	// reached one repeated, which is what an ordered walk gets wrong.
+	if got := expansionOf(program(2, 3, 2)); got != want {
+		t.Errorf("a repeated capture gives %d instances, want %d", got, want)
+	}
+}

@@ -85,9 +85,16 @@ It starts at the emission roots and follows operands, so a node no root
 reaches costs nothing: a generator does not emit dead code.
 
 The roots are the program root, the `subject_node` when the program declares
-one, and every capture no other root already reaches. **A capture the root
-reaches is not a second emission**: it is emitted inside the root's
-expression, and counting its subtree again charges it twice.
+one, and every capture no other root already reaches. **A capture any root
+reaches is not a second emission**: it is emitted inside that root's
+expression, and counting its subtree again charges it twice. This holds for
+a capture reached by another capture, not only by the program root.
+
+Take the captures from the highest index down. An operand always sits at a
+lower index than the node reading it, so a capture reached by another is
+seen after the one reaching it and one pass settles it. Walking the capture
+list in its own order makes the count depend on how the captures happen to
+be listed, which is not an observable property of the bundle.
 
 Their costs are summed, because a generator emits all of them. Checking each
 root separately would let a program carry any number of roots just below the

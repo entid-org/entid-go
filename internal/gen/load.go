@@ -4,9 +4,11 @@
 package gen
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"unicode/utf8"
 )
 
@@ -1157,10 +1159,17 @@ func checkAlphabet(alphabet string, has bool) error {
 //
 // The emission roots are the root node, the subject node when the program
 // declares one, and every capture no other root already reaches. A node no
-// root reaches is emitted by nobody and counts for nothing, and a capture the
-// root already reaches is not a second emission: it is the same subtree under
-// a name, so counting it twice would report instances the generator never
-// writes.
+// root reaches is emitted by nobody and counts for nothing, and a capture any
+// root reaches is not a second emission: it is the same subtree under a name,
+// so counting it twice would report instances the generator never writes.
+// That holds for a capture reached by another capture, not only by the
+// program root.
+//
+// The captures are taken from the highest index down. An operand always sits
+// at a lower index than the node reading it, so a capture reached by another
+// is seen after the one reaching it and one pass settles it. Walking the list
+// in its own order would make the count depend on how the captures happen to
+// be listed, which is not a property of the bundle.
 //
 // Their costs are summed, because a generator emits all of them. Checking each
 // root on its own would let a program carry any number of roots just below the
@@ -1200,10 +1209,15 @@ func expansionOf(p *Program) int64 {
 	if p.HasSubject && int(p.SubjectNode) < len(p.Nodes) {
 		reach(p.SubjectNode)
 	}
+	captures := make([]uint32, 0, len(p.Captures))
 	for _, c := range p.Captures {
 		if int(c.Node) < len(p.Nodes) {
-			reach(c.Node)
+			captures = append(captures, c.Node)
 		}
+	}
+	slices.SortFunc(captures, func(a, b uint32) int { return cmp.Compare(b, a) })
+	for _, node := range captures {
+		reach(node)
 	}
 	return total
 }
