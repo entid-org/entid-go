@@ -29,7 +29,7 @@ func incompatiblef(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrIncompatibleRuleset, fmt.Sprintf(format, args...))
 }
 
-// Load decodes and fully validates a rule bundle. It performs the twenty four
+// Load decodes and fully validates a rule bundle. It performs the twenty five
 // ordered checks of section 10 of ir.md and never returns a partially validated
 // graph: the bundle is either ready to generate from, or refused.
 //
@@ -135,7 +135,7 @@ func (v *validator) run() error {
 		return invalidf("source_digest holds %d bytes, 32 are required", len(b.SourceDigest))
 	}
 
-	// 8..15 operate on programs. Which ones route is declared by the
+	// 8..16 operate on programs. Which ones route is declared by the
 	// dispatchers, so that is collected first.
 	v.preCanonicalizers = make(map[uint32]bool, len(b.Dispatchers))
 	for _, d := range b.Dispatchers {
@@ -144,20 +144,20 @@ func (v *validator) run() error {
 	if err := v.checkPrograms(); err != nil {
 		return err
 	}
-	// 16..17 operate on identifier definitions.
+	// 17..18 operate on identifier definitions.
 	if err := v.checkIdentifiers(); err != nil {
 		return err
 	}
-	// 18..22 operate on dispatchers.
+	// 19..23 operate on dispatchers.
 	if err := v.checkDispatchers(); err != nil {
 		return err
 	}
-	// 23. call graph acyclic, typed and of static depth at most 32
+	// 24. call graph acyclic, typed and of static depth at most 32
 	if err := v.checkCallGraph(); err != nil {
 		return err
 	}
 
-	// 24. no capability used without being declared
+	// 25. no capability used without being declared
 	for _, id := range SupportedFeatures {
 		if v.usedFeatures[id] && !v.declared[id] {
 			return invalidf("capability %d is used but not declared in required_feature_ids", id)
@@ -172,7 +172,7 @@ func (v *validator) use(ids ...uint32) {
 	}
 }
 
-// checkPrograms runs checks 8 to 15.
+// checkPrograms runs checks 8 to 16.
 func (v *validator) checkPrograms() error {
 	b := v.bundle
 	b.programByID = make(map[uint32]*Program, len(b.Programs))
@@ -255,7 +255,7 @@ func (v *validator) checkProgram(p *Program) error {
 			return err
 		}
 
-		// 15. program shape, node level: accepted categories per program kind
+		// 16. program shape, node level: accepted categories per program kind
 		if err := v.checkCategory(p, i, n); err != nil {
 			return err
 		}
@@ -318,7 +318,7 @@ func (v *validator) checkProgram(p *Program) error {
 		v.use(FeatureCapturesAndCalls)
 	}
 
-	// 15. program shape, root level.
+	// 16. program shape, root level.
 	return v.checkRoot(p)
 }
 
@@ -687,9 +687,9 @@ func (v *validator) checkRoot(p *Program) error {
 	return nil
 }
 
-// checkIdentifiers runs checks 16 and 17.
+// checkIdentifiers runs checks 17 and 18.
 //
-//nolint:gocyclo // One ordered pass over the definitions, mirroring checks 16 and 17.
+//nolint:gocyclo // One ordered pass over the definitions, mirroring checks 17 and 18.
 func (v *validator) checkIdentifiers() error {
 	b := v.bundle
 	if len(b.Identifiers) > MaxIdentifiers {
@@ -697,6 +697,8 @@ func (v *validator) checkIdentifiers() error {
 	}
 	b.identifierByID = make(map[uint32]*IdentifierDefinition, len(b.Identifiers))
 	for i, d := range b.Identifiers {
+		// 17. identifier ids unique, kinds and countries well formed,
+		// serialization order respected
 		if d.ID == 0 {
 			return invalidf("identifier at index %d has id 0", i)
 		}
@@ -732,7 +734,7 @@ func (v *validator) checkIdentifiers() error {
 			return invalidf("identifier %d references %d as a format program", d.ID, d.FormatProgram)
 		}
 
-		// 17. exactly one checksum program or one absence reason per definition
+		// 18. exactly one checksum program or one absence reason per definition
 		switch {
 		case d.HasChecksumProgram && d.HasAbsentChecksumReason:
 			return invalidf("identifier %d declares both a checksum program and an absence reason", d.ID)
@@ -807,7 +809,7 @@ func programUses(b *Bundle, p *Program, op Opcode) bool {
 	return false
 }
 
-// checkDispatchers runs checks 18 to 22.
+// checkDispatchers runs checks 19 to 23.
 //
 //nolint:gocyclo // The dispatcher invariants are five ordered checks over the same structure; keeping them together mirrors ir.md section 10.
 func (v *validator) checkDispatchers() error {
@@ -816,7 +818,7 @@ func (v *validator) checkDispatchers() error {
 		v.use(FeatureIdentifierDispatch)
 	}
 
-	// 18. dispatcher kinds and aliases globally unique, sorted, never ambiguous
+	// 19. dispatcher kinds and aliases globally unique, sorted, never ambiguous
 	kindSpace := make(map[string]string, len(b.Dispatchers))
 	claim := func(token, owner string) error {
 		if prev, dup := kindSpace[token]; dup {
@@ -858,7 +860,7 @@ func (v *validator) checkDispatchers() error {
 		}
 	}
 
-	// 22. every definition referenced by exactly one dispatch target
+	// 23. every definition referenced by exactly one dispatch target
 	owner := make(map[uint32]string, len(b.Identifiers))
 	for _, d := range b.Dispatchers {
 		for _, t := range d.Targets {
@@ -895,8 +897,8 @@ func (v *validator) checkTargets(d *IdentifierDispatcher) error {
 	byCountry := make(map[string]bool, len(d.Targets))
 	byPrefix := make(map[string]string, len(d.Targets))
 
-	// 20. targets sorted, unique per country, prefixes claimed by at most one
-	// 21. GLOBAL targets alone, without prefix and without country alias
+	// 21. targets sorted, unique per country, prefixes claimed by at most one
+	// 22. GLOBAL targets alone, without prefix and without country alias
 	for i, t := range d.Targets {
 		if i > 0 && !targetOrderBefore(d.Targets[i-1], t) {
 			return invalidf("dispatcher %q does not sort its targets at index %d", d.Kind, i)
@@ -946,7 +948,7 @@ func (v *validator) checkTargets(d *IdentifierDispatcher) error {
 		}
 	}
 
-	// 19. country aliases sorted, unique, never self mapping, never shadowing
+	// 20. country aliases sorted, unique, never self mapping, never shadowing
 	for i, alias := range d.CountryAliases {
 		if !validCountryToken(alias.Alias) {
 			return invalidf("dispatcher %q declares the malformed country alias %q", d.Kind, alias.Alias)
@@ -977,7 +979,7 @@ func targetOrderBefore(prev, next *DispatchTarget) bool {
 	return prev.CountryCode < next.CountryCode
 }
 
-// checkCallGraph runs check 23.
+// checkCallGraph runs check 24.
 func (v *validator) checkCallGraph() error {
 	b := v.bundle
 	const (
@@ -1153,9 +1155,11 @@ func checkAlphabet(alphabet string, has bool) error {
 // A call counts as one instance: the callee is a program of its own, emitted
 // once and reached through a function call, so it is counted under its own id.
 //
-// The roots of the emission are the root node and every capture, since a
-// generator that materializes a capture emits its subtree too. A node no root
-// reaches is emitted by nobody and counts for nothing.
+// The emission roots are the root node and every capture. A node no root
+// reaches is emitted by nobody and counts for nothing, and a capture the root
+// already reaches is not a second emission: it is the same subtree under a
+// name, so counting it twice would report instances the generator never
+// writes.
 func expansionOf(p *Program) int64 {
 	instances := make([]int64, len(p.Nodes))
 	for i, n := range p.Nodes {
@@ -1167,10 +1171,30 @@ func expansionOf(p *Program) int64 {
 		}
 		instances[i] = total
 	}
-	total := instances[p.RootNode]
+
+	covered := make([]bool, len(p.Nodes))
+	total := int64(0)
+	reach := func(from uint32) {
+		if covered[from] {
+			return
+		}
+		total = saturatingAdd(total, instances[from])
+		// Operands are strictly lower, so one descending sweep marks the whole
+		// subtree without recursion.
+		covered[from] = true
+		for i := int(from); i >= 0; i-- {
+			if !covered[i] {
+				continue
+			}
+			for _, in := range p.Nodes[i].InputNodes {
+				covered[in] = true
+			}
+		}
+	}
+	reach(p.RootNode)
 	for _, c := range p.Captures {
 		if int(c.Node) < len(p.Nodes) {
-			total = saturatingAdd(total, instances[c.Node])
+			reach(c.Node)
 		}
 	}
 	return total

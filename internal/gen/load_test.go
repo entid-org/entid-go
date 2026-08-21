@@ -45,7 +45,7 @@ func TestLoadShippedBundle(t *testing.T) {
 		t.Fatalf("the bundle is empty: %d identifiers, %d dispatchers, %d programs",
 			len(b.Identifiers), len(b.Dispatchers), len(b.Programs))
 	}
-	// Every definition must be reachable through a dispatcher, which check 22
+	// Every definition must be reachable through a dispatcher, which check 23
 	// enforces; counting here would only freeze a number that grows.
 	t.Logf("rules %s: %d definitions, %d dispatchers, %d programs, %d nodes",
 		b.RulesVersion, len(b.Identifiers), len(b.Dispatchers), len(b.Programs), countNodes(b))

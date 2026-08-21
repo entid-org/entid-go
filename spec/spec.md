@@ -79,7 +79,7 @@ condition de produire les mêmes résultats : elle contredisait `PROVENANCE.md`,
 interpréteur complet.
 
 La raison n’est pas l’uniformité pour elle-même. Un interpréteur porte à l’exécution,
-chez chaque appelant, le validateur complet des vingt-quatre contrôles et la machine
+chez chaque appelant, le validateur complet des vingt-cinq contrôles et la machine
 d’exécution de soixante-trois opcodes — soit une surface d’attaque et un coût que le
 générateur paie une fois, à la construction, et que le code livré ne porte plus. Le
 refus reste une propriété du temps de génération.

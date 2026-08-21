@@ -51,7 +51,7 @@ Un moteur NE DOIT PAS interpréter le bundle à l’exécution. Le travail se s�
 deux :
 
 - un **générateur**, que vous écrivez, s’exécute à la construction du moteur. Il lit
-  `businessid-rules.binpb`, applique les vingt-quatre contrôles de chargement de
+  `businessid-rules.binpb`, applique les vingt-cinq contrôles de chargement de
   `ir.md` section 10, et émet du code source dans votre langage. Il refuse de produire
   quoi que ce soit s’il ne comprend pas une version, un champ, un opcode ou une
   capacité.
@@ -69,7 +69,7 @@ dans le contrat commun, où elle aurait dû être.
 
 Conséquence sur l’API : aucun moteur n’expose de fabrique acceptant un bundle en
 octets à l’exécution. Un jeu de règles personnalisé passe par le générateur, à la
-construction. Les vingt-quatre contrôles de chargement restent intégralement exigés,
+construction. Les vingt-cinq contrôles de chargement restent intégralement exigés,
 et le protocole `testee` les exerce : un testee qui génère du code en amont répond aux
 cas `load_ruleset` en appelant son générateur, comme le dit le commentaire du champ 7
 de `testee.proto`.
@@ -396,7 +396,7 @@ Cette distinction ne tient que si le décodage reste au niveau du fil. Un moteur
 résout un opcode, une valeur d’énumération ou un identifiant de capacité pendant le
 décodage signale un bundle plus récent au contrôle 2, avant que le contrôle des
 capacités puisse l’excuser, et l’écart de version redevient un bundle malformé.
-`ir.md` section 10 fait foi sur l’ordre complet des vingt-quatre contrôles ; la liste
+`ir.md` section 10 fait foi sur l’ordre complet des contrôles et sur leur nombre ; la liste
 ci-dessus en est la vue par famille.
 
 ### 7.4 Protobuf n’est pas l’API publique
@@ -786,17 +786,21 @@ Chaque moteur expose l’équivalent de :
 
 ```text
 defaultEngine()
-engineFromRules(bytes)
 canonicalize(input, options)
 validate(input, options)
 validateFormat(input, options)
 validateChecksum(input, options)
 rulesInfo()
 capabilities()
-registryLookup(input, provider, options)   # interface, aucune implémentation
 ```
 
 Les noms et styles sont adaptés au langage. Le chemin heureux doit être simple.
+
+Cette liste portait `engineFromRules(bytes)` et `registryLookup(...)` jusqu'à ce
+qu'un moteur relève qu'elle contredisait, dans le même document, la section 1.2 qui
+interdit la première et la section 10 qui diffère la seconde. Les deux sections sont
+les réécritures argumentées ; cette liste est celle à laquelle elles n'avaient pas été
+appliquées. Toutes ces opérations sont synchrones, définitivement.
 
 ### 15.2 Stabilité
 

@@ -267,8 +267,8 @@ func TestEveryOpcodeLoadsAndGenerates(t *testing.T) {
 	}
 }
 
-// TestRefusalsBeyondTheCorpus covers the checks the twenty three hostile
-// fixtures do not reach, so that every refusal path has a test.
+// TestRefusalsBeyondTheCorpus covers the checks the hostile fixtures of the
+// corpus do not reach, so that every refusal path has a test.
 func TestRefusalsBeyondTheCorpus(t *testing.T) {
 	tests := []struct {
 		name     string

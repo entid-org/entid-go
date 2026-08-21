@@ -271,12 +271,12 @@ go build -o bin/businessid-testee ./cmd/businessid-testee
 
 # from the spec repository
 go run ./cmd/conformance-runner \
-    --corpus dist/businessid-conformance-2026.08.16.binpb \
+    --corpus dist/businessid-conformance-2026.08.17.binpb \
     -- /path/to/businessid-testee
 ```
 
 ```
-rules 2026.08.16: 665 cases, 665 matched, 0 differed
+rules 2026.08.17: 665 cases, 665 matched, 0 differed
 conformant
 ```
 

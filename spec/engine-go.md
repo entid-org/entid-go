@@ -29,7 +29,7 @@ La bibliothèque doit :
 - générer, à la construction, le code des canonicalisations, formats et checksums à
   partir de `businessid-rules.binpb` ;
 - décoder et valider défensivement l’IR Protobuf **dans le générateur**, en appliquant
-  les vingt-quatre contrôles de `ir.md` section 10 et en refusant d’émettre du code
+  les contrôles de chargement de `ir.md` section 10 et en refusant d’émettre du code
   si l’un échoue ;
 - exécuter canonicalisation, format et checksum depuis le code généré, sans décodeur
   ni machine d’exécution de l’IR dans la bibliothèque publiée ;
@@ -75,7 +75,7 @@ Structure recommandée :
 ```
 
 Le générateur et la bibliothèque sont deux programmes. Le décodage Protobuf, les
-vingt-quatre contrôles de chargement et la connaissance des opcodes vivent dans le
+contrôles de chargement et la connaissance des opcodes vivent dans le
 générateur ; la bibliothèque publiée ne contient que le code émis, les primitives
 qu'il appelle et l'API. Aucun `.binpb` n'est compilé dans le paquet.
 

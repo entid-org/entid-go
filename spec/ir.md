@@ -79,11 +79,27 @@ A generator that inlines an operand where the graph reads it more than once
 must bound what it emits, and the budget above is that bound: a generated
 program may hold at most 100000 operation instances, counted after inlining.
 
+The count starts at the roots a generator emits from - the program root and
+each capture - and follows operands. A node no root reaches is emitted by
+nobody and counts for nothing, because the bound is on what a generator
+produces and a generator does not emit dead code. Two engines disagreed on
+this before it was written down, one counting every node and one counting
+the reachable ones, and answered differently on the same bundle.
+
+A `CALL` counts as one instance. The callee is a separate program, emitted
+once and reached by a function call, so its own instances are bounded on
+its own.
+
+The arithmetic saturates rather than wrapping. A chain two hundred levels
+deep reaches 2^201 instances, and an accumulator that overflows lands on a
+small number that passes: the overflow is the shape of the attack, not an
+edge case.
+
 The bound is not a formality. The node count of a program is bounded, but
 the graph is a DAG, and a DAG whose every node reads the previous one twice
-expands exponentially while passing all twenty four load checks. Without a
+expands exponentially while passing every one of the 25 load checks. Without a
 bound, such a bundle is a denial of service against the generator rather
-than against the engine, and the twenty four checks would not see it.
+than against the engine, and those 25 checks would not see it.
 
 Choosing the budget rather than a new number is deliberate: a generated
 program may not carry more instances than an interpreter would have taken
