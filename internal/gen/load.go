@@ -1155,11 +1155,16 @@ func checkAlphabet(alphabet string, has bool) error {
 // A call counts as one instance: the callee is a program of its own, emitted
 // once and reached through a function call, so it is counted under its own id.
 //
-// The emission roots are the root node and every capture. A node no root
-// reaches is emitted by nobody and counts for nothing, and a capture the root
-// already reaches is not a second emission: it is the same subtree under a
-// name, so counting it twice would report instances the generator never
+// The emission roots are the root node, the subject node when the program
+// declares one, and every capture no other root already reaches. A node no
+// root reaches is emitted by nobody and counts for nothing, and a capture the
+// root already reaches is not a second emission: it is the same subtree under
+// a name, so counting it twice would report instances the generator never
 // writes.
+//
+// Their costs are summed, because a generator emits all of them. Checking each
+// root on its own would let a program carry any number of roots just below the
+// ceiling.
 func expansionOf(p *Program) int64 {
 	instances := make([]int64, len(p.Nodes))
 	for i, n := range p.Nodes {
@@ -1192,6 +1197,9 @@ func expansionOf(p *Program) int64 {
 		}
 	}
 	reach(p.RootNode)
+	if p.HasSubject && int(p.SubjectNode) < len(p.Nodes) {
+		reach(p.SubjectNode)
+	}
 	for _, c := range p.Captures {
 		if int(c.Node) < len(p.Nodes) {
 			reach(c.Node)

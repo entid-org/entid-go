@@ -107,3 +107,43 @@ func TestExpansionCountsEachEmissionRootOnce(t *testing.T) {
 		})
 	}
 }
+
+// TestExpansionCountsTheSubjectNode covers the third emission root. A program
+// that declares a subject_node has its subtree emitted whether or not the root
+// reaches it, so it is a root of its own; no program of the shipped bundle
+// declares one, which is exactly why nothing would notice it missing.
+func TestExpansionCountsTheSubjectNode(t *testing.T) {
+	// n0 subject, n1 = f(n0), n2 = f(n1, n1) the root, n3 = f(n0) reached by
+	// nothing but a subject_node.
+	program := func(subject uint32, has bool) *Program {
+		return &Program{
+			ID: 1, Kind: ProgramFormat, RootNode: 2,
+			SubjectNode: subject, HasSubject: has,
+			Nodes: []*Node{
+				{Op: OpSubject, OutputType: ValueString},
+				{Op: OpSliceFrom, OutputType: ValueString, InputNodes: []uint32{0}},
+				{Op: OpConcat, OutputType: ValueString, InputNodes: []uint32{1, 1}},
+				{Op: OpSliceTo, OutputType: ValueString, InputNodes: []uint32{0}},
+			},
+		}
+	}
+
+	// From the root alone: 1 + 2*(1 + 1) = 5.
+	const rootAlone = 5
+	for _, tc := range []struct {
+		name    string
+		subject uint32
+		has     bool
+		want    int64
+	}{
+		{name: "no subject node", want: rootAlone},
+		{name: "a subject node the root reaches", subject: 1, has: true, want: rootAlone},
+		{name: "a subject node the root does not reach", subject: 3, has: true, want: rootAlone + 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := expansionOf(program(tc.subject, tc.has)); got != tc.want {
+				t.Fatalf("expansion %d, want %d", got, tc.want)
+			}
+		})
+	}
+}

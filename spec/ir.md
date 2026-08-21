@@ -79,12 +79,26 @@ A generator that inlines an operand where the graph reads it more than once
 must bound what it emits, and the budget above is that bound: a generated
 program may hold at most 100000 operation instances, counted after inlining.
 
-The count starts at the roots a generator emits from - the program root and
-each capture - and follows operands. A node no root reaches is emitted by
-nobody and counts for nothing, because the bound is on what a generator
-produces and a generator does not emit dead code. Two engines disagreed on
-this before it was written down, one counting every node and one counting
-the reachable ones, and answered differently on the same bundle.
+The count is what a generator emits, and three things follow from that.
+
+It starts at the emission roots and follows operands, so a node no root
+reaches costs nothing: a generator does not emit dead code.
+
+The roots are the program root, the `subject_node` when the program declares
+one, and every capture no other root already reaches. **A capture the root
+reaches is not a second emission**: it is emitted inside the root's
+expression, and counting its subtree again charges it twice.
+
+Their costs are summed, because a generator emits all of them. Checking each
+root separately would let a program carry any number of roots just below the
+ceiling.
+
+None of this is theoretical. Two engines counted every node rather than the
+reachable ones and answered differently on the same bundle; two others then
+summed every capture and reported 3204 instances for the published bundle
+where it holds 3069, because its 54 captures are all reached from their
+roots. No conformance case could see either divergence: both readings agree
+on every rule an author would write.
 
 A `CALL` counts as one instance. The callee is a separate program, emitted
 once and reached by a function call, so its own instances are bounded on
