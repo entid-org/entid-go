@@ -1,0 +1,113 @@
+// Copyright The LibBusinessID Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+// Package libbusinessid.conformance.v1 defines the shared conformance suite
+// consumed by every engine. It is generated from the reviewed JSONL corpus and
+// must never be edited by hand.
+package libbusinessid.conformance.v1;
+
+import "libbusinessid/ir/v1/rules.proto";
+
+option go_package = "github.com/libbusinessid/spec/gen/go/libbusinessid/conformance/v1;conformancev1";
+
+// ConformanceBundle is the root message of `businessid-conformance.binpb`.
+message ConformanceBundle {
+  uint32 format_version = 1;
+  string rules_version = 2;
+  // SHA-256 (exactly 32 bytes) of the canonical conformance source stream.
+  bytes source_digest = 3;
+  // Cases sorted by id.
+  repeated ConformanceCase cases = 4;
+}
+
+// ConformanceCase is one reviewed expectation.
+message ConformanceCase {
+  string id = 1;
+  string description = 2;
+  string kind = 3;
+  optional string country_code = 4;
+  string input = 5;
+  string profile = 6;
+  Operation operation = 7;
+  ExpectedOutcome expected = 8;
+  repeated string tags = 9;
+  repeated string source_ids = 10;
+  // Only used by OPERATION_LOAD_RULESET.
+  optional bytes rules_payload = 11;
+  optional string expected_engine_error = 12;
+  bool generated = 13;
+  string data_classification = 14;
+  string redistribution_basis = 15;
+}
+
+// ExpectedOutcome is the reviewed expectation of a business operation.
+message ExpectedOutcome {
+  oneof value {
+    ExpectedCanonicalization canonicalization = 1;
+    ExpectedValidationReport validation_report = 2;
+  }
+}
+
+// ExpectedCanonicalization mirrors CanonicalizationResult without engineVersion.
+message ExpectedCanonicalization {
+  string kind = 1;
+  string input_value = 2;
+  string canonical_value = 3;
+  optional string country_code = 4;
+  string profile = 5;
+  string rules_version = 6;
+  uint32 format_version = 7;
+  StepStatus status = 8;
+  libbusinessid.ir.v1.ReasonCode reason_code = 9;
+  optional string message_key = 10;
+}
+
+// ExpectedValidationReport mirrors ValidationReport without engineVersion.
+message ExpectedValidationReport {
+  string kind = 1;
+  string input_value = 2;
+  string canonical_value = 3;
+  optional string country_code = 4;
+  string profile = 5;
+  string rules_version = 6;
+  uint32 format_version = 7;
+  ExpectedStep format = 8;
+  ExpectedStep checksum = 9;
+}
+
+// ExpectedStep mirrors StepResult without the human readable message.
+message ExpectedStep {
+  ValidationLevel level = 1;
+  StepStatus status = 2;
+  libbusinessid.ir.v1.ReasonCode reason_code = 3;
+  optional string message_key = 4;
+}
+
+// Operation is the engine entry point exercised by a case.
+enum Operation {
+  OPERATION_UNSPECIFIED = 0;
+  OPERATION_CANONICALIZE = 1;
+  OPERATION_VALIDATE_FORMAT = 2;
+  OPERATION_VALIDATE_CHECKSUM = 3;
+  OPERATION_VALIDATE = 4;
+  OPERATION_LOAD_RULESET = 5;
+}
+
+// StepStatus is the outcome of one validation step.
+enum StepStatus {
+  STEP_STATUS_UNSPECIFIED = 0;
+  STEP_STATUS_VALID = 1;
+  STEP_STATUS_INVALID = 2;
+  STEP_STATUS_UNSUPPORTED = 3;
+  STEP_STATUS_NOT_RUN = 4;
+}
+
+// ValidationLevel names the step a result belongs to.
+enum ValidationLevel {
+  VALIDATION_LEVEL_UNSPECIFIED = 0;
+  VALIDATION_LEVEL_FORMAT = 1;
+  VALIDATION_LEVEL_CHECKSUM = 2;
+  VALIDATION_LEVEL_REGISTRY = 3;
+}

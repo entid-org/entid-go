@@ -1,0 +1,18 @@
+# Pre-release lock, produced locally from the spec repository.
+#
+# `attestation_identity` is deliberately absent: no release has been tagged
+# yet, so there is no attested workflow identity to record. Once the first
+# release exists, the downstream pull request replaces this file with an
+# attested one, and the generator resolves the bundle from that release
+# instead of the local copy under spec/.
+rules_version = "2026.08.17"
+format_version = 1
+rules_sha256 = "0eedb113e0e14a00791ec0a25c3d1f29b4c848111f44f666426bb0d15c77762a"
+conformance_sha256 = "8df2085617a622d02984b1ebc3e8be3609cda6c38c1ff6c0cdb0f9bc69ee77d5"
+rules_proto_sha256 = "40c4472007251677dfc3df287188dba177cab6ab62b6d9546e05e89291a77465"
+conformance_proto_sha256 = "600b40465a71450ca452b26beae99dafcef43cda8b4e7dbe7e32d7b70e5c2a6e"
+testee_proto_sha256 = "7209846f3dc2f2f43da537f9ef74f1beee6a02be612ab53594220e997acf3dbc"
+ir_doc_sha256 = "796e7d83bffc795ca30bab3ecc13e7505fef3e92072932188759b02a380c672a"
+features_doc_sha256 = "1cb41bff278f1606f0215ccac387c92abf7ec2bdcc7683be93b52c9291f3689a"
+stability = "alpha"
+source_commit = "6e7fb24ae17d641cadbaef14de4e5c905e4ebce7"

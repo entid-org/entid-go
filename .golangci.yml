@@ -1,0 +1,51 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - nilerr
+    - prealloc
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - whitespace
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+    gosec:
+      excludes:
+        # The one unsafe.String lives in internal/runtime/buffer.go, is
+        # documented, and is what keeps canonicalization allocation free.
+        - G103
+
+  exclusions:
+    rules:
+      # Generated code mirrors the bundle: its shape is decided upstream.
+      - path: rules_gen\.go
+        linters:
+          - gocritic
+          - revive
+          - unparam
+      # Test helpers build deliberately malformed input.
+      - path: _test\.go
+        linters:
+          - gosec
+          - prealloc
+
+formatters:
+  enable:
+    - gofmt

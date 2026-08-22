@@ -1,0 +1,397 @@
+// Copyright The LibBusinessID Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+// Package libbusinessid.ir.v1 defines the LibBusinessID intermediate
+// representation (IR) consumed by every engine. The exhaustive normative
+// semantics of every message, enum value and execution limit is published in
+// docs/ir.md, which is generated from the same registry as this schema.
+package libbusinessid.ir.v1;
+
+option go_package = "github.com/libbusinessid/spec/gen/go/libbusinessid/ir/v1;irv1";
+
+// RuleBundle is the root message of `businessid-rules.binpb`.
+//
+// The bundle carries no timestamp: `generatedAt` only exists in the external
+// manifest and is derived from SOURCE_DATE_EPOCH.
+message RuleBundle {
+  // Structural version of the IR. Engines reject any unsupported value.
+  uint32 format_version = 1;
+  // Business version of the rules, formatted as YYYY.MM.PATCH.
+  string rules_version = 2;
+  // Every capability required to execute this bundle, sorted ascending.
+  repeated uint32 required_feature_ids = 3;
+  // SHA-256 (exactly 32 bytes) of the canonical rule source stream.
+  bytes source_digest = 4;
+  reserved 5;
+  reserved "generated_at";
+  // Identifier definitions sorted by kind then GLOBAL first, then country code.
+  repeated IdentifierDefinition identifiers = 6;
+  // Programs sorted by id.
+  repeated Program programs = 7;
+  // Dispatchers sorted by the UTF-8 bytes of their canonical kind.
+  repeated IdentifierDispatcher dispatchers = 8;
+}
+
+// IdentifierDefinition binds a canonicalizer, a format rule and an optional
+// checksum rule to a (kind, country) pair.
+message IdentifierDefinition {
+  uint32 id = 1;
+  string kind = 2;
+  // Absent means GLOBAL. The empty string and the literal "GLOBAL" are invalid.
+  optional string country_code = 3;
+  uint32 canonicalization_program = 4;
+  uint32 format_program = 5;
+  optional uint32 checksum_program = 6;
+  string default_profile = 7;
+  repeated Source sources = 8;
+  // Reason reported when checksum_program is absent. Restricted to
+  // REASON_CODE_UNSUPPORTED_CHECKSUM and REASON_CODE_CHECKSUM_NOT_PUBLISHED.
+  optional ReasonCode absent_checksum_reason = 9;
+}
+
+// Source is the provenance record of a rule.
+message Source {
+  string id = 1;
+  string url = 2;
+  string authority = 3;
+  string title = 4;
+  string accessed_at = 5;
+  string jurisdiction = 6;
+  string language = 7;
+  string notes = 8;
+  string license_or_terms = 9;
+  optional string archive_url = 10;
+  // How close the source sits to the authority that defines the format.
+  SourceTier tier = 11;
+}
+
+// SourceTier separates a document published by the authority owning the format
+// from a third party description of it.
+//
+// Both are usable, but they do not carry the same weight: a secondary source
+// can be accurate and still be someone's reading of an algorithm the authority
+// never published. Recording which is which keeps that visible instead of
+// letting every rule look equally well founded.
+enum SourceTier {
+  SOURCE_TIER_UNSPECIFIED = 0;
+  // Published by the authority that owns the format, or the law establishing
+  // it.
+  SOURCE_TIER_PRIMARY = 1;
+  // A third party description: a reference implementation, an industry note,
+  // an encyclopedia. Used when the authority documents the format but not its
+  // check algorithm.
+  SOURCE_TIER_SECONDARY = 2;
+}
+
+// IdentifierDispatcher routes a (kind, optional country, raw value) triple to
+// exactly one identifier definition, before any definition specific
+// canonicalization runs.
+message IdentifierDispatcher {
+  string kind = 1;
+  repeated string kind_aliases = 2;
+  uint32 pre_canonicalization_program = 3;
+  repeated CountryAlias country_aliases = 4;
+  repeated DispatchTarget targets = 5;
+}
+
+// CountryAlias maps a non ISO 3166-1 alpha-2 token to a canonical country code.
+message CountryAlias {
+  string alias = 1;
+  string country_code = 2;
+}
+
+// DispatchTarget is one routing entry of a dispatcher.
+message DispatchTarget {
+  // Absent means the GLOBAL target.
+  optional string country_code = 1;
+  repeated string accepted_prefixes = 2;
+  optional string canonical_prefix = 3;
+  uint32 identifier_definition_id = 4;
+  bool allow_unprefixed_without_country = 5;
+}
+
+// Program is a typed acyclic node graph in topological order.
+message Program {
+  uint32 id = 1;
+  ProgramKind kind = 2;
+  repeated Node nodes = 3;
+  uint32 root_node = 4;
+  // Named captures of a format program. Metadata only: capture references are
+  // lowered to direct node references.
+  repeated Capture captures = 5;
+  // Node producing subject() when the program is entered at top level. Absent
+  // means subject() is the current canonical value.
+  optional uint32 subject_node = 6;
+}
+
+// Capture names a node of a format program.
+message Capture {
+  string name = 1;
+  uint32 node = 2;
+}
+
+// Node is one operation of a program. input_nodes only reference strictly
+// lower indices of the same program.
+message Node {
+  ValueType output_type = 1;
+  repeated uint32 input_nodes = 2;
+
+  oneof operation {
+    StringOperation string_operation = 10;
+    IntegerOperation integer_operation = 11;
+    PredicateOperation predicate_operation = 12;
+    CanonicalizationOperation canonicalization_operation = 13;
+    AssertionOperation assertion_operation = 14;
+    ChecksumOperation checksum_operation = 15;
+    CallOperation call_operation = 16;
+  }
+}
+
+// StringOperation produces a possibly absent string view.
+message StringOperation {
+  StringOpKind kind = 1;
+  // Constant text, delimiter, or prefix depending on kind.
+  optional string text = 2;
+  optional uint32 start = 3;
+  optional uint32 end = 4;
+}
+
+// IntegerOperation produces a bounded signed integer or an indeterminate value.
+message IntegerOperation {
+  IntegerOpKind kind = 1;
+  optional int64 modulus = 2;
+  repeated int64 weights = 3;
+  optional WeightAlignment alignment = 4;
+  optional CharMapping mapping = 5;
+  repeated int64 remainder_values = 6;
+  // The ordered alphabet of CHAR_MAPPING_CUSTOM_ALPHABET: the value of a code
+  // point is its index here. Required by that mapping and forbidden by the
+  // others, so a bundle cannot state an alphabet nothing reads.
+  optional string alphabet = 7;
+}
+
+// PredicateOperation produces a boolean.
+message PredicateOperation {
+  PredicateOpKind kind = 1;
+  // Prefix, suffix, literal, character set or profile name depending on kind.
+  optional string text = 2;
+  repeated string values = 3;
+  repeated uint32 lengths = 4;
+  optional uint32 length = 5;
+  optional uint32 min_length = 6;
+  optional uint32 max_length = 7;
+  optional uint32 index = 8;
+  // The literal an integer operand is compared against, for INTEGER_IS. Signed
+  // and bounded like every other integer of the IR.
+  optional int64 constant = 9;
+}
+
+// CanonicalizationOperation transforms the current value.
+message CanonicalizationOperation {
+  CanonicalizationOpKind kind = 1;
+  // Character set, prefix, inserted or padded text depending on kind.
+  optional string text = 2;
+  optional string replacement = 3;
+  optional uint32 index = 4;
+  optional uint32 length = 5;
+}
+
+// AssertionOperation orders format checks.
+message AssertionOperation {
+  AssertionOpKind kind = 1;
+  optional ReasonCode reason_code = 2;
+  optional string message_key = 3;
+}
+
+// ChecksumOperation produces a tri-state checksum outcome.
+message ChecksumOperation {
+  ChecksumOpKind kind = 1;
+  optional uint32 index = 2;
+  optional uint32 start = 3;
+  optional uint32 end = 4;
+  optional ReasonCode reason_code = 5;
+  optional string message_key = 6;
+  // The literal the operand is compared against, for COMPARE_CONSTANT. Signed
+  // because an integer expression is signed, and bounded by the same checked
+  // arithmetic as every other integer of the IR.
+  optional int64 constant = 7;
+}
+
+// CallOperation reuses another program on a caller supplied view.
+message CallOperation {
+  CallOpKind kind = 1;
+  uint32 program_id = 2;
+}
+
+// ValueType is the static type of a node output.
+enum ValueType {
+  VALUE_TYPE_UNSPECIFIED = 0;
+  VALUE_TYPE_STRING = 1;
+  VALUE_TYPE_INTEGER = 2;
+  VALUE_TYPE_BOOLEAN = 3;
+  VALUE_TYPE_CANONICALIZATION_STEP = 4;
+  VALUE_TYPE_ASSERTION = 5;
+  VALUE_TYPE_CHECKSUM_OUTCOME = 6;
+}
+
+// ProgramKind constrains which operations a program may contain.
+enum ProgramKind {
+  PROGRAM_KIND_UNSPECIFIED = 0;
+  PROGRAM_KIND_CANONICALIZATION = 1;
+  PROGRAM_KIND_FORMAT = 2;
+  PROGRAM_KIND_CHECKSUM = 3;
+}
+
+// ReasonCode is the immutable V1 registry of machine readable reasons.
+enum ReasonCode {
+  REASON_CODE_UNSPECIFIED = 0;
+  REASON_CODE_OK = 1;
+  REASON_CODE_EMPTY = 2;
+  REASON_CODE_INVALID_LENGTH = 3;
+  REASON_CODE_INVALID_CHARACTERS = 4;
+  REASON_CODE_INVALID_FORMAT = 5;
+  REASON_CODE_INVALID_CHECKSUM = 6;
+  REASON_CODE_MISSING_COUNTRY_CODE = 7;
+  REASON_CODE_COUNTRY_MISMATCH = 8;
+  REASON_CODE_UNSUPPORTED_KIND = 9;
+  REASON_CODE_UNSUPPORTED_COUNTRY = 10;
+  REASON_CODE_UNSUPPORTED_FORMAT = 11;
+  REASON_CODE_UNSUPPORTED_CHECKSUM = 12;
+  REASON_CODE_CHECKSUM_NOT_PUBLISHED = 13;
+  REASON_CODE_NOT_REQUESTED = 14;
+  REASON_CODE_NOT_RUN_FORMAT_INVALID = 15;
+  REASON_CODE_NOT_RUN_FORMAT_UNSUPPORTED = 16;
+  REASON_CODE_REGISTRY_NOT_CONFIGURED = 17;
+  REASON_CODE_INCOMPATIBLE_RULESET = 18;
+  REASON_CODE_INVALID_RULESET = 19;
+  REASON_CODE_INPUT_TOO_LONG = 20;
+  // The input is not valid UTF-8. Like INPUT_TOO_LONG this is a safety bound
+  // reported before any rule runs, never a business verdict.
+  REASON_CODE_INVALID_ENCODING = 21;
+}
+
+// StringOpKind enumerates the V1 string constructors.
+enum StringOpKind {
+  STRING_OP_KIND_UNSPECIFIED = 0;
+  STRING_OP_KIND_CONSTANT = 1;
+  STRING_OP_KIND_VALUE = 2;
+  STRING_OP_KIND_SUBJECT = 3;
+  STRING_OP_KIND_COUNTRY_CODE = 4;
+  STRING_OP_KIND_SLICE = 5;
+  STRING_OP_KIND_SLICE_FROM = 6;
+  STRING_OP_KIND_SLICE_TO = 7;
+  STRING_OP_KIND_BEFORE_FIRST = 8;
+  STRING_OP_KIND_AFTER_FIRST = 9;
+  STRING_OP_KIND_STRIP_PREFIX = 10;
+  STRING_OP_KIND_CONCAT = 11;
+}
+
+// IntegerOpKind enumerates the V1 integer constructors.
+enum IntegerOpKind {
+  INTEGER_OP_KIND_UNSPECIFIED = 0;
+  INTEGER_OP_KIND_DIGITS_TO_INTEGER = 1;
+  INTEGER_OP_KIND_MOD_DIGITS = 2;
+  INTEGER_OP_KIND_WEIGHTED_SUM = 3;
+  INTEGER_OP_KIND_MODULO = 4;
+  INTEGER_OP_KIND_COMPLEMENT = 5;
+  INTEGER_OP_KIND_REMAINDER_MAP = 6;
+}
+
+// WeightAlignment describes how weights are paired with input code points.
+enum WeightAlignment {
+  WEIGHT_ALIGNMENT_UNSPECIFIED = 0;
+  WEIGHT_ALIGNMENT_LEFT = 1;
+  WEIGHT_ALIGNMENT_RIGHT = 2;
+  WEIGHT_ALIGNMENT_CYCLE = 3;
+}
+
+// CharMapping maps a code point to its numeric contribution.
+enum CharMapping {
+  CHAR_MAPPING_UNSPECIFIED = 0;
+  CHAR_MAPPING_DIGIT_VALUE = 1;
+  CHAR_MAPPING_ALNUM_BASE36 = 2;
+  // The value of a code point is its index in the alphabet the operation
+  // carries. Issuers routinely drop the letters that are read as digits, and
+  // the resulting alphabet is neither base 10 nor base 36: the Chinese unified
+  // social credit code omits I, O, S, V and Z, so its J is 18 where base 36
+  // makes it 19.
+  CHAR_MAPPING_CUSTOM_ALPHABET = 3;
+}
+
+// PredicateOpKind enumerates the V1 predicates.
+enum PredicateOpKind {
+  PREDICATE_OP_KIND_UNSPECIFIED = 0;
+  PREDICATE_OP_KIND_IS_EMPTY = 1;
+  PREDICATE_OP_KIND_IS_ABSENT = 2;
+  PREDICATE_OP_KIND_EQUALS = 3;
+  PREDICATE_OP_KIND_LENGTH_EQ = 4;
+  PREDICATE_OP_KIND_LENGTH_IN = 5;
+  PREDICATE_OP_KIND_LENGTH_BETWEEN = 6;
+  PREDICATE_OP_KIND_ASCII_DIGITS = 7;
+  PREDICATE_OP_KIND_ASCII_UPPER_LETTERS = 8;
+  PREDICATE_OP_KIND_ASCII_ALPHANUMERIC = 9;
+  PREDICATE_OP_KIND_ASCII_CHARSET = 10;
+  PREDICATE_OP_KIND_STARTS_WITH = 11;
+  PREDICATE_OP_KIND_ENDS_WITH = 12;
+  PREDICATE_OP_KIND_PREFIX_IN = 13;
+  PREDICATE_OP_KIND_CHAR_AT_IN = 14;
+  PREDICATE_OP_KIND_CONTAINS = 15;
+  PREDICATE_OP_KIND_ALL = 16;
+  PREDICATE_OP_KIND_ANY = 17;
+  PREDICATE_OP_KIND_NOT = 18;
+  PREDICATE_OP_KIND_PROFILE_IS = 19;
+  // True when an integer expression equals a literal. Every other predicate
+  // reads a string, which left no way to branch on the value of a remainder.
+  PREDICATE_OP_KIND_INTEGER_IS = 20;
+}
+
+// CanonicalizationOpKind enumerates the V1 canonicalization steps.
+enum CanonicalizationOpKind {
+  CANONICALIZATION_OP_KIND_UNSPECIFIED = 0;
+  CANONICALIZATION_OP_KIND_SEQUENCE = 1;
+  CANONICALIZATION_OP_KIND_TRIM_WHITESPACE = 2;
+  CANONICALIZATION_OP_KIND_REMOVE_WHITESPACE = 3;
+  CANONICALIZATION_OP_KIND_UPPERCASE_ASCII = 4;
+  CANONICALIZATION_OP_KIND_REMOVE_CHARS = 5;
+  CANONICALIZATION_OP_KIND_REPLACE_PREFIX = 6;
+  CANONICALIZATION_OP_KIND_PREPEND = 7;
+  CANONICALIZATION_OP_KIND_APPEND = 8;
+  CANONICALIZATION_OP_KIND_INSERT = 9;
+  CANONICALIZATION_OP_KIND_LEFT_PAD = 10;
+  CANONICALIZATION_OP_KIND_PREPEND_COUNTRY_IF_MISSING = 11;
+  CANONICALIZATION_OP_KIND_WHEN = 12;
+}
+
+// AssertionOpKind enumerates the V1 assertion nodes.
+enum AssertionOpKind {
+  ASSERTION_OP_KIND_UNSPECIFIED = 0;
+  ASSERTION_OP_KIND_SEQUENCE = 1;
+  ASSERTION_OP_KIND_REQUIRE = 2;
+}
+
+// ChecksumOpKind enumerates the V1 checksum nodes.
+enum ChecksumOpKind {
+  CHECKSUM_OP_KIND_UNSPECIFIED = 0;
+  CHECKSUM_OP_KIND_LUHN = 1;
+  CHECKSUM_OP_KIND_ISO7064_MOD97_10 = 2;
+  CHECKSUM_OP_KIND_COMPARE_DIGIT = 3;
+  CHECKSUM_OP_KIND_COMPARE_SLICE = 4;
+  CHECKSUM_OP_KIND_CHOOSE = 5;
+  CHECKSUM_OP_KIND_WHEN = 6;
+  CHECKSUM_OP_KIND_ALL_CHECKS = 7;
+  CHECKSUM_OP_KIND_ANY_CHECK = 8;
+  CHECKSUM_OP_KIND_UNSUPPORTED = 9;
+  // Compares a computed integer against a literal constant. COMPARE_DIGIT and
+  // COMPARE_SLICE can only compare against part of the value being checked, so a
+  // rule stating that a remainder must equal zero had nothing to compare with.
+  CHECKSUM_OP_KIND_COMPARE_CONSTANT = 10;
+}
+
+// CallOpKind selects the program family reused by a CallOperation.
+enum CallOpKind {
+  CALL_OP_KIND_UNSPECIFIED = 0;
+  CALL_OP_KIND_FORMAT = 1;
+  CALL_OP_KIND_CHECKSUM = 2;
+}
