@@ -718,3 +718,39 @@ func TestExpansionBudget(t *testing.T) {
 		}
 	})
 }
+
+// TestSubjectNodeMayNotReadTheSubject covers the clause check 15 gained in
+// 2026.08.18. A subject_node built from subject() defines the subject in terms
+// of itself: a generator that emits the subtree recurses forever, an
+// interpreter exhausts its budget, and nothing saw it because the node was
+// checked for scope and type but never walked.
+func TestSubjectNodeMayNotReadTheSubject(t *testing.T) {
+	// Node 2 of the format program is a slice of node 0, which is SUBJECT.
+	// Node 3 is a slice of node 1, a constant, which reads nothing.
+	build := func(subject uint32) bundle {
+		raw := allOpcodesBundle()
+		p := &raw.programs[1]
+		p.hasSubject, p.subject = true, subject
+		return raw
+	}
+
+	t.Run("a subject node reaching the subject", func(t *testing.T) {
+		// Node 4 is slice(subject, 0, 2), so its subtree holds SUBJECT.
+		if _, err := gen.Load(build(4).encode()); !errors.Is(err, gen.ErrInvalidRuleset) {
+			t.Fatalf("got %v, want invalid_ruleset", err)
+		}
+	})
+
+	t.Run("the subject node being the subject itself", func(t *testing.T) {
+		if _, err := gen.Load(build(0).encode()); !errors.Is(err, gen.ErrInvalidRuleset) {
+			t.Fatalf("got %v, want invalid_ruleset", err)
+		}
+	})
+
+	t.Run("a subject node reading nothing of the subject", func(t *testing.T) {
+		// Node 2 is country_code(), which is not built from the subject.
+		if _, err := gen.Load(build(2).encode()); err != nil {
+			t.Fatalf("a subject node that reads no subject must load: %v", err)
+		}
+	})
+}

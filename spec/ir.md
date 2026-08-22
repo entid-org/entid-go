@@ -90,6 +90,10 @@ reaches is not a second emission**: it is emitted inside that root's
 expression, and counting its subtree again charges it twice. This holds for
 a capture reached by another capture, not only by the program root.
 
+Check 14 counts from the roots that check 15 validates, so an engine may run
+15 first. Both answer `invalid_ruleset`, so the order is not observable, and
+stating it would constrain an implementation without changing an answer.
+
 Take the captures from the highest index down. An operand always sits at a
 lower index than the node reading it, so a capture reached by another is
 seen after the one reaching it and one pass settles it. Walking the capture
@@ -1293,7 +1297,7 @@ An engine performs these checks, in this order, before executing anything:
 12. only the parameters the operation declares, and every required parameter
 13. arithmetic bounds: moduli, weights, remainder tables, indices, provable integer widths and the alphabet of a custom mapping
 14. expansion within the evaluation budget once repeated operands are inlined
-15. root, subject and capture nodes inside the program and correctly typed
+15. root, subject and capture nodes inside the program, correctly typed, and a subject node that does not read the subject it defines
 16. program shape: accepted root per kind, `WHEN` only inside `CHOOSE`, and a pre-canonicalization program restricted to its five permitted operations
 17. identifier ids unique, kinds and countries well formed, serialization order respected
 18. exactly one checksum program or one absence reason per definition

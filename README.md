@@ -271,12 +271,12 @@ go build -o bin/businessid-testee ./cmd/businessid-testee
 
 # from the spec repository
 go run ./cmd/conformance-runner \
-    --corpus dist/businessid-conformance-2026.08.17.binpb \
+    --corpus dist/businessid-conformance-2026.08.18.binpb \
     -- /path/to/businessid-testee
 ```
 
 ```
-rules 2026.08.17: 665 cases, 665 matched, 0 differed
+rules 2026.08.18: 666 cases, 666 matched, 0 differed
 conformant
 ```
 
@@ -285,7 +285,7 @@ The testee never reads the corpus and never sees an expected result; it echoes
 the case identifier so a desynchronized exchange is detected, and uses it for
 nothing else.
 
-The 34 `load_ruleset` cases address the generator rather than the engine, since
+The 35 `load_ruleset` cases address the generator rather than the engine, since
 this engine loads no bundle at run time. The testee routes them to it, and
 `go test ./internal/gen` covers them too.
 

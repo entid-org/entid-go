@@ -108,7 +108,6 @@ statuts `unsupported` et `not_run` sont des résultats normaux.
 Le moteur V1 implémente :
 
 - chargement de règles embarquées ;
-- chargement optionnel d’un bundle fourni en mémoire ;
 - canonicalisation ;
 - format ;
 - checksum ;
@@ -352,10 +351,15 @@ race. Après chargement, toutes les structures sont immuables.
 
 ### 7.2 Bundle personnalisé
 
-Le moteur PEUT permettre la construction depuis des bytes. Cette API est considérée
-comme traitant une entrée non fiable et applique toutes les validations et limites.
+Un jeu de règles personnalisé passe par le générateur, à la construction. Le moteur
+n'expose aucune fabrique acceptant un bundle en octets : la section 1.2 l'interdit,
+parce qu'une telle API impose le validateur complet et la machine d'exécution de l'IR
+à chaque appelant.
 
-Le moteur ne télécharge jamais lui-même le bundle en V1.
+Le générateur, lui, traite le bundle comme une entrée non fiable et applique les
+vingt-cinq contrôles avant d'émettre la moindre ligne.
+
+Le moteur ne télécharge jamais le bundle.
 
 ### 7.3 Validation obligatoire avant exécution
 
