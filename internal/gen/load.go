@@ -290,6 +290,10 @@ func (v *validator) checkProgram(p *Program) error {
 		if p.Nodes[p.SubjectNode].OutputType != ValueString {
 			return invalidf("program %d subject node %d does not produce a string", p.ID, p.SubjectNode)
 		}
+		if i, reads := readsSubject(p, p.SubjectNode); reads {
+			return invalidf("program %d builds its subject node %d from node %d, which reads the subject it defines",
+				p.ID, p.SubjectNode, i)
+		}
 		v.use(FeatureCapturesAndCalls)
 	}
 	if len(p.Captures) > 0 {
@@ -1238,4 +1242,36 @@ func describeExpansion(n int64) string {
 		return fmt.Sprintf("more than %d", MaxSteps)
 	}
 	return fmt.Sprintf("%d", n)
+}
+
+// readsSubject reports whether the subtree of from holds a SUBJECT node, and
+// which one.
+//
+// A subject node built from subject() defines the subject in terms of itself: a
+// generator emitting that subtree recurses forever and an interpreter exhausts
+// its budget. Checking the node for scope and type never sees it, because the
+// defect is in what the node reads rather than in what it is.
+//
+// A CALL inside the subtree is not a cycle. Its callee receives the operand as
+// its own subject, so a SUBJECT node inside the callee reads the supplied view;
+// only a SUBJECT node of this program closes the loop, and the operand it is
+// given is part of the subtree this walk covers.
+func readsSubject(p *Program, from uint32) (uint32, bool) {
+	// Operands are strictly lower, which check 11 proved, so one descending
+	// sweep covers the subtree without recursion.
+	reached := make([]bool, len(p.Nodes))
+	reached[from] = true
+	for i := int(from); i >= 0; i-- {
+		if !reached[i] {
+			continue
+		}
+		if p.Nodes[i].Op == OpSubject {
+			// i indexes a slice, so the conversion is exact.
+			return uint32(i), true //nolint:gosec // i is a slice index of a bounded node list
+		}
+		for _, in := range p.Nodes[i].InputNodes {
+			reached[in] = true
+		}
+	}
+	return 0, false
 }

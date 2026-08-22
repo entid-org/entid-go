@@ -202,6 +202,17 @@ type prog struct {
 	kind  int
 	nodes []node
 	root  uint32
+	// subject is only written when hasSubject is set, so that a test can tell
+	// an absent subject_node from one naming node 0.
+	subject    uint32
+	hasSubject bool
+	captures   []capture
+}
+
+// capture names a node of a format program.
+type capture struct {
+	name string
+	node uint32
 }
 
 func (p prog) encode() []byte {
@@ -209,7 +220,14 @@ func (p prog) encode() []byte {
 	for _, n := range p.nodes {
 		body = append(body, n.encode()...)
 	}
-	return bfield(7, append(body, vfield(4, uint64(p.root))...))
+	body = append(body, vfield(4, uint64(p.root))...)
+	for _, c := range p.captures {
+		body = append(body, bfield(5, append(str(1, c.name), vfield(2, uint64(c.node))...))...)
+	}
+	if p.hasSubject {
+		body = append(body, vfield(6, uint64(p.subject))...)
+	}
+	return bfield(7, body)
 }
 
 // def describes one identifier definition.
