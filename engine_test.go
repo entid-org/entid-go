@@ -143,6 +143,17 @@ func TestInputIsReportedUnchanged(t *testing.T) {
 // form one have none to evaluate, so the value is refused verbatim rather than
 // canonicalized: a step filtering by code point would substitute U+FFFD for
 // every malformed byte and change the value it reports.
+//
+// Step 1 of that section requires each engine to pin invalid_encoding with a
+// native test, because no conformance case can carry it: a proto3 string is
+// valid UTF-8 by definition, on the wire and in the corpus, so the corpus has
+// no way to spell an ill formed value. This is that test, and the malformed
+// form it names is the one a Go string admits: a Go string is an arbitrary
+// byte sequence, so any byte that starts no valid UTF-8 sequence reaches the
+// public API unchanged. The values below are the three shapes of that: a
+// lone 0xff, which no sequence may contain; a truncated multi byte sequence;
+// and a surrogate, whose bytes are well formed but whose code point UTF-8
+// forbids.
 func TestMalformedUTF8IsRefusedBeforeAnyRule(t *testing.T) {
 	engine := businessid.New()
 
