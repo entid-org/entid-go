@@ -66,6 +66,13 @@ jobs:
       # never judge a corpus it was not written for. It is a build tool: it
       # enters neither the published package nor its dependencies.
       - name: Conformance
+        # setup-go pins GOTOOLCHAIN to local so that what ships is built with
+        # the toolchain go.mod names, and that pin is kept for the build above.
+        # The runner is not what ships: it is a build tool from another module,
+        # which declares a newer toolchain than this one, so its own step lets
+        # the go command fetch the toolchain that module asks for.
+        env:
+          GOTOOLCHAIN: auto
         run: |
           commit=$(grep '^source_commit' rules.lock | cut -d'"' -f2)
           test -n "$commit" || { echo "rules.lock records no source_commit" >&2; exit 1; }
