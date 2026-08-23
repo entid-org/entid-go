@@ -663,7 +663,34 @@ Tous les cas communs sont obligatoires. Un moteur ne peut pas exclure un cas pou
 faire passer sa CI. Une incompatibilité doit être corrigée ou documentée comme
 blocage de release.
 
+Le moteur fournit un **testee** et rien d'autre : un exécutable qui lit des requêtes
+sur son entrée standard, appelle son API publique et écrit des réponses. Il ne lit
+pas le corpus, n'interprète aucun résultat attendu et n'adapte pas son comportement
+au cas reçu.
+
+Le **runner**, lui, vient de `spec` et de nulle part ailleurs. Il s'exécute épinglé au
+commit que `rules.lock` enregistre sous `source_commit`, donc au même commit que le
+corpus :
+
+```bash
+go run github.com/libbusinessid/spec/cmd/conformance-runner@<source_commit> \
+  -corpus spec/businessid-conformance.binpb -- ./mon-testee
+```
+
+Aucune release n'est nécessaire, rien n'est à télécharger à la main, et le seul
+prérequis est une toolchain Go dans la CI : c'est un outil de construction, il
+n'entre ni dans le paquet publié ni dans ses dépendances.
+
+Un moteur NE DOIT PAS écrire son propre runner. C'est la seule chose qui fasse que
+« conforme » veuille dire quelque chose : un comparateur écrit par le moteur qu'il
+juge peut comparer trop faiblement — oublier un champ, traiter un champ absent
+comme un champ vide — et son moteur affichera la conformité en étant faux. Deux
+moteurs en ont écrit un, faute de savoir que celui-ci était accessible.
+
 ### 11.2 Comparaison normative
+
+Ce qui suit décrit ce que le runner compare. Un moteur n'a pas à l'implémenter ;
+c'est ici pour qu'il sache sur quoi il est jugé.
 
 Pour `canonicalize`, les champs comparés sont tous ceux de
 `CanonicalizationResult`, sauf `engineVersion`. Pour les trois opérations de
@@ -694,7 +721,23 @@ La conformité partagée ne remplace pas :
 - tests de limites ;
 - property tests et fuzzing ;
 - benchmarks ;
-- tests de régression propres au runtime.
+- tests de régression propres au runtime ;
+- tests prouvant que le testee ne triche pas.
+
+Ce dernier point mérite d'être précisé, parce qu'une intention ne se teste pas.
+Le moteur TypeScript l'a formulé en propriétés observables, et c'est la forme
+exigée :
+
+| Ce qu'on affirme | Ce que ça exclut |
+| --- | --- |
+| le testee ne nomme ni le corpus ni rien qui en lise un | la lecture directe des attendus |
+| il n'atteint aucun système de fichiers | le corpus est un fichier ; qui n'ouvre rien ne le lit pas |
+| il répond identiquement quel que soit l'identifiant de cas — plausible, absurde, vide | la reconnaissance d'un cas |
+| il répond identiquement quel que soit l'ordre des requêtes | un comportement dépendant de l'historique |
+| il répond identiquement à une requête répétée | le non-déterminisme |
+
+Les requêtes de ces tests sont inventées sur place : le test d'honnêteté n'ouvre
+pas le corpus non plus, sinon il démontrerait le contraire de ce qu'il affirme.
 
 ## 12. Exigences qualité
 

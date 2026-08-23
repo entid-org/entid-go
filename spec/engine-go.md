@@ -216,6 +216,23 @@ d’un bundle minimal, une opération, un rapport, un cas de conformité, puis �
 - benchmarks `testing.B` pour cold load, validation, invalidité précoce, checksum
   complexe et parallélisme ;
 - conformité commune sans filtre ;
+
+Le runner de conformité vient de `spec`, jamais de ce dépôt. Il s'exécute épinglé au
+commit que `rules.lock` enregistre sous `source_commit` :
+
+```bash
+go run github.com/libbusinessid/spec/cmd/conformance-runner@<source_commit> \
+  -corpus spec/businessid-conformance.binpb -- ./businessid-testee
+```
+
+N'écris pas de comparateur : un moteur qui juge lui-même ses propres résultats peut
+se déclarer conforme en comparant trop faiblement. Ce que tu écris, c'est le testee,
+et les tests qui prouvent qu'il ne triche pas.
+
+`invalid_encoding` ne peut pas être un cas de conformité — `ir.md` section 5 étape 1
+dit pourquoi. Épingle-le par un test natif portant une chaîne contenant un octet
+qui ne forme pas d'UTF-8, par exemple `"12\xff34"`.
+
 - test d’intégration d’un module consommateur minimal.
 
 Quality gates :
