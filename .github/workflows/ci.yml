@@ -48,6 +48,30 @@ jobs:
           go test ./internal/gen -run FuzzLoad -fuzz FuzzLoad -fuzztime 30s
           go test . -run FuzzValidate -fuzz FuzzValidate -fuzztime 30s
 
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Build the testee
+        run: go build -o bin/businessid-testee ./cmd/businessid-testee
+
+      # Section 8.7 of spec.md: the runner comes from the spec repository and
+      # nowhere else, pinned to the commit rules.lock records under
+      # source_commit - the same commit as the corpus, so that a comparator can
+      # never judge a corpus it was not written for. It is a build tool: it
+      # enters neither the published package nor its dependencies.
+      - name: Conformance
+        run: |
+          commit=$(grep '^source_commit' rules.lock | cut -d'"' -f2)
+          test -n "$commit" || { echo "rules.lock records no source_commit" >&2; exit 1; }
+          go run "github.com/libbusinessid/spec/cmd/conformance-runner@$commit" \
+            -corpus spec/businessid-conformance.binpb -- ./bin/businessid-testee
+
   lint:
     runs-on: ubuntu-latest
     steps:
