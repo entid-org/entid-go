@@ -754,3 +754,26 @@ func TestSubjectNodeMayNotReadTheSubject(t *testing.T) {
 		}
 	})
 }
+
+// TestSubjectNodeDeclaresItsCapability pins what section 11 of features.md
+// freezes: Program.subject_node belongs to CAPTURES_AND_CALLS_V1, so a bundle
+// carrying one without declaring capability 11 is refused by check 25.
+//
+// Deriving the capability from the captures alone and ignoring the field is the
+// shape of the defect: the bundle loads, and the engine that reads features.md
+// rather than its own code is the one that looks wrong.
+func TestSubjectNodeDeclaresItsCapability(t *testing.T) {
+	// Node 2 is country_code(), which reads no subject, so only the capability
+	// can be what answers.
+	raw := allOpcodesBundle()
+	raw.programs[1].hasSubject, raw.programs[1].subject = true, 2
+
+	if _, err := gen.Load(raw.encode()); err != nil {
+		t.Fatalf("a declared capability 11 must let the subject node through: %v", err)
+	}
+
+	raw.features = withoutFeature(raw.features, 11)
+	if _, err := gen.Load(raw.encode()); !errors.Is(err, gen.ErrInvalidRuleset) {
+		t.Fatalf("got %v, want invalid_ruleset for an undeclared capability 11", err)
+	}
+}

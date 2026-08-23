@@ -329,7 +329,8 @@ Sont des erreurs techniques :
 - graphe invalide ;
 - dépassement de limite structurelle ;
 - invariant interne violé ;
-- provider registre ayant échoué techniquement.
+- provider registre ayant échoué techniquement — réservé, pas à livrer : la
+  section 10 diffère le registre et aucun moteur V1 n'en porte.
 
 Une API peut représenter ces erreurs par exception, `Result`, `error`, type scellé ou
 Promise rejetée selon le langage. Les APIs spécifiques sont définies dans les
@@ -686,10 +687,10 @@ validation, ils sont tous ceux de `ValidationReport`, sauf `engineVersion`, donc
 La conformité partagée ne remplace pas :
 
 - tests unitaires de chaque opération IR ;
-- tests du décodeur et validateur de bundle ;
+- tests du décodeur et du validateur de bundle, dans le générateur ;
 - tests de l’API publique ;
 - tests de concurrence ;
-- tests de packaging de la ressource ;
+- tests de packaging : que le paquet publié ne porte ni bundle ni décodeur ;
 - tests de limites ;
 - property tests et fuzzing ;
 - benchmarks ;
@@ -761,8 +762,7 @@ comparaisons de positions, bornes et dispatch. Objectif recommandé : mutation s
 - aucune locale globale ;
 - aucun cache mutable non synchronisé ;
 - aucun état de validation conservé entre deux appels ;
-- initialisation lazy thread-safe ;
-- provider registre injecté explicitement.
+- initialisation lazy thread-safe.
 
 Les types publics doivent signaler leur sûreté de concurrence selon les conventions
 du langage (`Sendable`, immutable data classes, etc.).
@@ -903,14 +903,15 @@ Un moteur NE DOIT PAS :
 
 Un moteur est prêt à publier lorsque :
 
-- il charge le bundle embarqué et refuse tous les bundles invalides communs ;
+- son générateur refuse tous les bundles invalides communs, et la bibliothèque
+  publiée ne porte ni bundle ni décodeur ;
 - il supporte toutes les feature IDs requises ;
 - l’API publique est idiomatique et documentée ;
 - dispatch, canonicalisation, format et checksum suivent exactement le pipeline
   normatif et les quatre opérations retournent les formes imposées ;
-- l’interface registre existe sans implémentation ;
 - toute la conformité partagée passe ;
-- les tests propres au moteur couvrent décodeur, IR, API, concurrence et packaging ;
+- les tests propres au moteur couvrent l'IR, l'API, la concurrence et le
+  packaging, et ceux du générateur couvrent le décodeur ;
 - les seuils de couverture sont atteints ;
 - les fuzzers ne trouvent aucun crash ;
 - lint et analyse statique sont sans avertissement ;
