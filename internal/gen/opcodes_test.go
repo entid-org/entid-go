@@ -777,3 +777,71 @@ func TestSubjectNodeDeclaresItsCapability(t *testing.T) {
 		t.Fatalf("got %v, want invalid_ruleset for an undeclared capability 11", err)
 	}
 }
+
+// TestCheckOrderFollowsSection10 pins the order of section 10 of ir.md where a
+// bundle carries two faults at once, which is the only place the order is
+// observable. Every load failure answers invalid_ruleset, so two engines can
+// disagree on which rule refused a bundle while both report the same code, and
+// nothing in the corpus sees it.
+//
+// Check 16 covers program shape. It names the accepted operation categories of
+// the program kind as well as the accepted root, and it runs after check 13,
+// which bounds arithmetic, and after check 15, which places the root. Running
+// the category rule inside the per node pass puts it ahead of both: a category
+// fault on an early node then answers for a bundle whose real first fault, in
+// the order the specification fixes, lies further down.
+func TestCheckOrderFollowsSection10(t *testing.T) {
+	// A canonicalization operation inside a format program is the category
+	// fault of check 16. Node 3 of the format program feeds nothing, so
+	// replacing it cannot trip an earlier check on one of its consumers.
+	categoryFault := func(b *bundle) {
+		b.programs[1].nodes[3] = cn(cTrim, nil)
+	}
+
+	for _, tc := range []struct {
+		name     string
+		mutate   func(*bundle)
+		contains string
+	}{
+		{
+			name: "check 13 answers before check 16",
+			mutate: func(b *bundle) {
+				categoryFault(b)
+				b.programs[1].nodes[4] = sn(sSlice, []uint32{0},
+					start(0), end(gen.MaxSliceBound+1))
+			},
+			contains: "end is 4097, the limit is 4096",
+		},
+		{
+			name: "check 15 answers before check 16",
+			mutate: func(b *bundle) {
+				categoryFault(b)
+				b.programs[1].root = 999
+			},
+			contains: "has root node 999 outside its",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := allOpcodesBundle()
+			tc.mutate(&b)
+			_, err := gen.Load(b.encode())
+			if !errors.Is(err, gen.ErrInvalidRuleset) {
+				t.Fatalf("got %v, want invalid_ruleset", err)
+			}
+			if !strings.Contains(err.Error(), tc.contains) {
+				t.Fatalf("check 16 answered first: %q does not mention %q", err, tc.contains)
+			}
+		})
+	}
+
+	// The category fault alone is still refused, and by check 16.
+	b := allOpcodesBundle()
+	categoryFault(&b)
+	_, err := gen.Load(b.encode())
+	if !errors.Is(err, gen.ErrInvalidRuleset) {
+		t.Fatalf("got %v, want invalid_ruleset", err)
+	}
+	if !strings.Contains(err.Error(), "which a format program may not contain") {
+		t.Fatalf("diagnostic %q does not name the category rule", err)
+	}
+}
