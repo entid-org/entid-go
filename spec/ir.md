@@ -1081,6 +1081,18 @@ to 8 ASCII alphanumeric characters compared case sensitively.
    step that filters by code point would otherwise substitute U+FFFD for each
    malformed byte, tripling the value and making two engines disagree on the
    canonical value they report.
+
+   This reason is reachable only through an API whose string type admits ill
+   formed text, and no conformance case can carry it: a proto3 `string` is
+   valid UTF-8 by definition, on the wire and in the corpus. Nor is there one
+   portable malformed value to carry - an invalid byte in a language whose
+   strings are bytes, an unpaired surrogate in a language whose strings are
+   UTF-16 code units, and nothing at all in a language whose strings are
+   always well formed. An engine MUST therefore pin this step with a native
+   test naming the malformed form its own string type admits, and an engine
+   whose string type admits none MUST document that, and why, rather than
+   widening its public API with a byte oriented entry point that exists only
+   to reach this branch.
 2. Normalize the kind by trim ASCII, lower case ASCII and the `kind_aliases` table.
 3. If no dispatcher matches, return `unsupported_kind` without running any program.
 4. Run the `pre_canonicalization_program` exactly once on the raw value. It
