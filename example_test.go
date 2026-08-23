@@ -11,6 +11,13 @@ import (
 	businessid "github.com/libbusinessid/businessid-go"
 )
 
+// The identifiers below come from the shared conformance corpus, which
+// classifies them as synthetic: they are produced by the documented generator
+// of the specification's data policy so that the published check digit holds,
+// and they are drawn from no register. BE0123456749 is the value of case
+// vat-be-valid-001 and 012345674 that of siren-valid-001. None of them
+// designates a company.
+
 func ExampleEngine_Validate() {
 	engine := businessid.New()
 

@@ -40,6 +40,14 @@ func main() {
 
 Full API documentation: [pkg.go.dev](https://pkg.go.dev/github.com/libbusinessid/businessid-go).
 
+Every identifier shown in this README and in the runnable examples is a value the
+shared conformance corpus carries — `BE0123456749` under `vat-be-valid-001`,
+`012345674` under `siren-valid-001`. The corpus classifies them as **synthetic**:
+they are built by the documented generator of the specification's data policy so
+that they satisfy the published check digit, and they are not taken from any
+register. No identifier here designates a company, and none was made up on the
+spot.
+
 ## What it answers, and what it does not
 
 Two questions, and no others: **does this value have the shape of a documented
