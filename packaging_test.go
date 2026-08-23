@@ -4,9 +4,12 @@
 package businessid_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -207,5 +210,134 @@ func TestNoRunnerLivesHere(t *testing.T) {
 	// rules.lock itself must carry a commit for the workflow to read.
 	if commit := lockValue(t, "source_commit"); !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(commit) {
 		t.Errorf("rules.lock records source_commit %q, which is no commit", commit)
+	}
+}
+
+// moduleFiles lists the files this module owns, applying the rule the Go
+// modules reference gives for what a module zip carries: everything under the
+// module root, except version control directories and except any directory
+// holding a go.mod of its own, which is a module in its own right.
+func moduleFiles(t *testing.T) []string {
+	t.Helper()
+	vcs := map[string]bool{".git": true, ".hg": true, ".bzr": true, ".svn": true}
+	var out []string
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			out = append(out, filepath.ToSlash(path))
+			return nil
+		}
+		if path == "." {
+			return nil
+		}
+		if vcs[d.Name()] {
+			return filepath.SkipDir
+		}
+		if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) == 0 {
+		t.Fatal("the walk found no file at all; the test proved nothing")
+	}
+	return out
+}
+
+// TestPublishedModuleCarriesNoSpecMirror covers the granularity go list cannot
+// see. A module zip carries every file under the module root, not only the ones
+// a package compiles, so the spec mirror travelled to every consumer's module
+// cache - measured at 1 095 540 bytes of bundle, corpus and JSONL, more than
+// half the archive - for code that never opens any of it.
+//
+// The go.mod under spec/ makes it a module of its own, which the parent's zip
+// excludes. The generator still reads the files from disk, and sync_engines.sh
+// copies file by file without erasing the directory, so the go.mod survives a
+// resynchronization.
+func TestPublishedModuleCarriesNoSpecMirror(t *testing.T) {
+	// The mirror must still be there: a test that passed because the files had
+	// been deleted would prove the opposite of what it claims.
+	for _, needed := range []string{
+		filepath.Join("spec", "go.mod"),
+		filepath.Join("spec", "businessid-rules.binpb"),
+		filepath.Join("spec", "businessid-conformance.binpb"),
+		filepath.Join("spec", "businessid-conformance.jsonl"),
+	} {
+		if _, err := os.Stat(needed); err != nil {
+			t.Fatalf("%s must exist and be excluded, not be missing: %v", needed, err)
+		}
+	}
+
+	// The toolchain must agree that spec/ is a separate module, which is the
+	// premise the exclusion rests on.
+	out, err := exec.Command(goTool(t), "list", "-m").Output()
+	if err != nil {
+		t.Fatalf("go list -m: %v", err)
+	}
+	parent := strings.TrimSpace(string(out))
+	cmd := exec.Command(goTool(t), "list", "-m")
+	cmd.Dir = "spec"
+	out, err = cmd.Output()
+	if err != nil {
+		t.Fatalf("go list -m in spec: %v", err)
+	}
+	if nested := strings.TrimSpace(string(out)); nested == parent {
+		t.Fatalf("spec/ reports the module %q, the same as the parent: it is not a nested module", nested)
+	}
+
+	for _, path := range moduleFiles(t) {
+		if strings.HasPrefix(path, "spec/") {
+			t.Errorf("the published module carries %s", path)
+		}
+		switch filepath.Ext(path) {
+		case ".binpb", ".jsonl":
+			t.Errorf("the published module carries %s, which is rule or corpus data", path)
+		}
+	}
+}
+
+// TestRulesLockDigestsMatchTheMirror recomputes every digest rules.lock
+// declares. The workflow checked only the bundle, so the corpus, the three
+// .proto files and the two documents could have drifted from what the lock
+// attests without anything noticing; the JSONL was not even listed until
+// 2026.08.26, and engine tests cite its case ids as provenance.
+func TestRulesLockDigestsMatchTheMirror(t *testing.T) {
+	digests := map[string]string{
+		"rules_sha256":             "businessid-rules.binpb",
+		"conformance_sha256":       "businessid-conformance.binpb",
+		"conformance_jsonl_sha256": "businessid-conformance.jsonl",
+		"rules_proto_sha256":       "rules.proto",
+		"conformance_proto_sha256": "conformance.proto",
+		"testee_proto_sha256":      "testee.proto",
+		"ir_doc_sha256":            "ir.md",
+		"features_doc_sha256":      "features.md",
+	}
+	// Every key rules.lock declares must be one of these, so a digest added
+	// upstream fails here instead of going unverified.
+	raw, err := os.ReadFile("rules.lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range regexp.MustCompile(`(?m)^(\w+_sha256)\s*=`).FindAllStringSubmatch(string(raw), -1) {
+		if _, known := digests[m[1]]; !known {
+			t.Errorf("rules.lock declares %s, which nothing here verifies", m[1])
+		}
+	}
+
+	for key, name := range digests {
+		content, err := os.ReadFile(filepath.Join("spec", name))
+		if err != nil {
+			t.Errorf("%s: %v", key, err)
+			continue
+		}
+		sum := sha256.Sum256(content)
+		if got, want := hex.EncodeToString(sum[:]), lockValue(t, key); got != want {
+			t.Errorf("%s: spec/%s hashes to %s, rules.lock declares %s", key, name, got, want)
+		}
 	}
 }

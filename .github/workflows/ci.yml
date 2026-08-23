@@ -32,6 +32,34 @@ jobs:
           go generate ./...
           git diff --exit-code -- rules_gen.go
 
+      # The published artifact is a module zip, not a package: it carries every
+      # file under the module root, so go list -deps cannot see this. spec/ was
+      # 1 095 540 bytes of bundle, corpus and JSONL landing in every consumer's
+      # module cache for code that never opens any of it; spec/go.mod makes the
+      # directory a module of its own, which the parent's zip excludes.
+      #
+      # This opens the zip a consumer would actually download. GOPRIVATE sends
+      # the go command straight to the repository instead of the proxy, so it
+      # builds the zip itself from the commit under test, with no waiting for a
+      # proxy to observe the branch and nothing published to the checksum
+      # database.
+      - name: The published module zip carries no rule or corpus data
+        env:
+          GOPRIVATE: github.com/libbusinessid/businessid-go
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          module=github.com/libbusinessid/businessid-go
+          zip=$(go mod download -json "$module@$SHA" | grep -o '"Zip": *"[^"]*"' | head -1 | cut -d'"' -f4)
+          test -n "$zip" || { echo "go mod download reported no zip for $SHA" >&2; exit 1; }
+          echo "opened $zip"
+          unzip -l "$zip" | tail -3
+          if unzip -l "$zip" | grep -E '/spec/|\.binpb|\.jsonl' ; then
+            echo "rule or corpus data travels in the published module" >&2
+            exit 1
+          fi
+          echo "no rule or corpus data in the published module zip"
+
       - name: Format
         run: |
           gofmt -l . | tee /tmp/unformatted
@@ -66,11 +94,12 @@ jobs:
       # never judge a corpus it was not written for. It is a build tool: it
       # enters neither the published package nor its dependencies.
       - name: Conformance
-        # setup-go pins GOTOOLCHAIN to local so that what ships is built with
-        # the toolchain go.mod names, and that pin is kept for the build above.
-        # The runner is not what ships: it is a build tool from another module,
-        # which declares a newer toolchain than this one, so its own step lets
-        # the go command fetch the toolchain that module asks for.
+        # Section 8.7 of spec.md and section 11 of engine.md require this:
+        # setup-go pins GOTOOLCHAIN to local, the spec module declares a newer
+        # toolchain than this one pins, and without the override the step fails
+        # on toolchain resolution rather than on a conformance difference. The
+        # testee above stays built with the toolchain go.mod names, because
+        # that is what ships; the runner is a build tool from another module.
         env:
           GOTOOLCHAIN: auto
         run: |
