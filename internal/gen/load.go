@@ -257,11 +257,6 @@ func (v *validator) checkProgram(p *Program) error {
 			return err
 		}
 
-		// 16. program shape, node level: accepted categories per program kind
-		if err := v.checkCategory(p, i, n); err != nil {
-			return err
-		}
-
 		v.use(spec.features...)
 		bounds[i] = stringBound(n, bounds)
 	}
@@ -324,7 +319,17 @@ func (v *validator) checkProgram(p *Program) error {
 		v.use(FeatureCapturesAndCalls)
 	}
 
-	// 16. program shape, root level.
+	// 16. program shape: the accepted operation categories of the kind, then
+	// the accepted root. Section 10 places this after checks 13, 14 and 15, so
+	// it is a pass of its own rather than a step of the node loop above. Run
+	// per node, it would answer for a bundle whose first fault in the order
+	// the specification fixes lies further down, and two engines splitting the
+	// pass differently would disagree while both reporting invalid_ruleset.
+	for i, n := range p.Nodes {
+		if err := v.checkCategory(p, i, n); err != nil {
+			return err
+		}
+	}
 	return v.checkRoot(p)
 }
 
