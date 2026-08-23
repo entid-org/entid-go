@@ -1310,7 +1310,7 @@ An engine performs these checks, in this order, before executing anything:
 13. arithmetic bounds: moduli, weights, remainder tables, indices, provable integer widths and the alphabet of a custom mapping
 14. expansion within the evaluation budget once repeated operands are inlined
 15. root, subject and capture nodes inside the program, correctly typed, and a subject node that does not read the subject it defines
-16. program shape: accepted root per kind, `WHEN` only inside `CHOOSE`, and a pre-canonicalization program restricted to its five permitted operations
+16. program shape: the accepted root and the accepted operation categories of the kind, both as section 2 states them, `WHEN` only inside `CHOOSE`, and a pre-canonicalization program restricted to its five permitted operations
 17. identifier ids unique, kinds and countries well formed, serialization order respected
 18. exactly one checksum program or one absence reason per definition
 19. dispatcher kinds and aliases globally unique, sorted, and never ambiguous

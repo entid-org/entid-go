@@ -202,6 +202,21 @@ TDD obligatoire :
 Ne commence pas par implémenter toute l’IR. Construis verticalement : chargement
 d’un bundle minimal, une opération, un rapport, un cas de conformité, puis étends.
 
+## Le module publié ne doit pas transporter `spec/`
+
+Un zip de module Go embarque tout ce qui vit sous la racine du module, y compris
+`spec/` : le bundle, le corpus et le JSONL, mesurés à 1,07 Mo. Aucun paquet publié
+ne les lit — `go list -deps` le prouve — mais le cache de modules de chaque appelant
+les porte quand même, ce qui est exactement le coût que la section 1.2 refuse.
+
+Poser un `spec/go.mod` en fait un module imbriqué, que le zip du module parent
+exclut. Le générateur lit toujours les fichiers depuis le disque, et
+`tools/sync_engines.sh` copie fichier par fichier sans effacer le répertoire, donc
+ce `go.mod` survit aux resynchronisations.
+
+Vérifier par un test que le zip publié ne porte ni `.binpb` ni corpus, plutôt que
+de le supposer : la granularité qui compte est celle du module, pas celle du paquet.
+
 ## Tests Go obligatoires
 
 - tests table-driven pour chaque opération ;
