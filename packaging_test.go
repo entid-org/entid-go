@@ -179,13 +179,23 @@ func TestNoRunnerLivesHere(t *testing.T) {
 		t.Errorf("this repository builds %v, and may build only %v", commands, want)
 	}
 
+	// The checks live in the verification script, and the workflow calls it:
+	// section 12.5 of engine.md asks for one entry point so that green has one
+	// definition. Both are read, so neither can drift away from the other.
+	script, err := os.ReadFile(filepath.Join("scripts", "verify.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ci := string(script)
 	workflow, err := os.ReadFile(filepath.Join(".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	ci := string(workflow)
+	if !strings.Contains(string(workflow), "make verify") {
+		t.Error("the workflow does not call make verify, so CI and a developer can disagree about green")
+	}
 
-	// The workflow must fetch the runner from the spec module.
+	// The script must fetch the runner from the spec module.
 	const runner = "github.com/libbusinessid/spec/cmd/conformance-runner@"
 	if !strings.Contains(ci, runner) {
 		t.Fatalf("the workflow never runs %s", runner)
@@ -351,17 +361,17 @@ func TestRulesLockDigestsMatchTheMirror(t *testing.T) {
 // The exclusions are asserted rather than trusted, because an exclusion added
 // quietly is how a gate stops meaning anything.
 func TestCoverageGateIsDeclared(t *testing.T) {
-	workflow, err := os.ReadFile(filepath.Join(".github", "workflows", "ci.yml"))
+	script, err := os.ReadFile(filepath.Join("scripts", "verify.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	ci := string(workflow)
+	ci := string(script)
 
-	if !strings.Contains(ci, "-coverprofile=coverage.out") {
-		t.Error("the workflow measures no coverage")
+	if !strings.Contains(ci, "-coverprofile=") {
+		t.Error("the verification measures no coverage")
 	}
-	if !strings.Contains(ci, "pct < 95.0") {
-		t.Error("the workflow declares no 95 per cent gate")
+	if !strings.Contains(ci, "pct >= 95.0") {
+		t.Error("the verification declares no 95 per cent gate")
 	}
 	// Exactly two exclusions, each for a stated reason.
 	for _, excluded := range []string{`rules_gen\.go`, `cmd\/businessid-demo`} {
@@ -373,9 +383,13 @@ func TestCoverageGateIsDeclared(t *testing.T) {
 	if !strings.Contains(ci, "published not gated") {
 		t.Error("the coverage of the generated rules is not published")
 	}
+	// And the gate must be reached by the same entry point as everything else.
+	if _, err := os.Stat("Makefile"); err != nil {
+		t.Errorf("there is no Makefile, so there is no single entry point: %v", err)
+	}
 	// A threshold below the one the specification names would be a silent
 	// lowering, which is the thing this test exists to prevent.
-	for _, m := range regexp.MustCompile(`pct < (\d+(?:\.\d+)?)`).FindAllStringSubmatch(ci, -1) {
+	for _, m := range regexp.MustCompile(`pct >= (\d+(?:\.\d+)?)`).FindAllStringSubmatch(ci, -1) {
 		if m[1] != "95.0" {
 			t.Errorf("the gate is set at %s, and engine.md section 12.2 names 95", m[1])
 		}
