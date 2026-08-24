@@ -13,6 +13,7 @@
 package runtime
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -275,14 +276,44 @@ func (v View) LengthIn(lengths ...int) bool {
 	return false
 }
 
-// PrefixIn reports whether the view is present and starts with at least one of
-// the prefixes.
-func (v View) PrefixIn(prefixes ...string) bool {
+// PrefixGroup is the set of accepted prefixes sharing one byte length, sorted
+// ascending. The generator builds these, one per distinct length, from the
+// values of a single prefix_in node.
+type PrefixGroup struct {
+	// Length is the byte length every value in the group has.
+	Length int
+	// Values is sorted ascending and holds no duplicate. Section 10 of ir.md
+	// requires a bundle's prefix_in values to be strictly ascending, and the
+	// loader refuses one where they are not, so filtering that list by length
+	// yields a sorted list without reordering anything.
+	Values []string
+}
+
+// PrefixInSorted reports whether the view is present and starts with at least
+// one of the prefixes of the groups. The name states the precondition: the
+// groups must be sorted, and the answer is wrong rather than slow if they are
+// not.
+//
+// Section 14 of engine.md requires a membership test not to be linear in the
+// size of the list, which matters because the cost falls on the refused input:
+// a scan stops early on a value it finds and reads everything on a value it
+// does not. Grouping by length is what makes a search exact. Within one group
+// every value has the same length, so "starts with one of these" is "equals
+// the first Length bytes", which a binary search answers in log time on keys
+// of constant size. Across groups the work is one search per distinct length,
+// and a rule declares one or two.
+//
+// The groups are read, never written, so one slice is shared by every call and
+// nothing is built per validation.
+func (v View) PrefixInSorted(groups []PrefixGroup) bool {
 	if !v.present {
 		return false
 	}
-	for _, p := range prefixes {
-		if strings.HasPrefix(v.s, p) {
+	for _, g := range groups {
+		if len(v.s) < g.Length {
+			continue
+		}
+		if _, found := slices.BinarySearch(g.Values, v.s[:g.Length]); found {
 			return true
 		}
 	}

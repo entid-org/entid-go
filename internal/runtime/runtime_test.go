@@ -4,6 +4,7 @@
 package runtime_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -465,19 +466,27 @@ func TestViewPrimitivesTheShippedRulesDoNotReach(t *testing.T) {
 	})
 
 	t.Run("prefix_in", func(t *testing.T) {
+		two := []rt.PrefixGroup{{Length: 2, Values: []string{"BE", "FR"}}}
 		for _, tc := range []struct {
-			in       rt.View
-			prefixes []string
-			want     bool
+			in     rt.View
+			groups []rt.PrefixGroup
+			want   bool
 		}{
-			{rt.Value("FR123"), []string{"BE", "FR"}, true},
-			{rt.Value("FR123"), []string{"BE", "DE"}, false},
+			{rt.Value("FR123"), two, true},
+			{rt.Value("BE123"), two, true},
+			{rt.Value("DE123"), two, false},
 			{rt.Value("FR123"), nil, false},
-			{rt.Value("FR123"), []string{""}, true},
-			{rt.Absent, []string{"FR"}, false},
+			{rt.Value("F"), two, false}, // shorter than the group
+			{rt.Value("FR"), two, true}, // exactly the group length
+			{rt.Absent, two, false},
+			// Two lengths, which is the shape the German register rule takes.
+			{rt.Value("B1000X"), []rt.PrefixGroup{
+				{Length: 5, Values: []string{"A1000", "B1000"}},
+				{Length: 6, Values: []string{"B1000Y", "B1000Z"}},
+			}, true},
 		} {
-			if got := tc.in.PrefixIn(tc.prefixes...); got != tc.want {
-				t.Errorf("PrefixIn(%q, %v) = %v", tc.in.String(), tc.prefixes, got)
+			if got := tc.in.PrefixInSorted(tc.groups); got != tc.want {
+				t.Errorf("PrefixInSorted(%q, %v) = %v", tc.in.String(), tc.groups, got)
 			}
 		}
 	})
@@ -524,4 +533,95 @@ func TestViewPrimitivesTheShippedRulesDoNotReach(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestPrefixInSortedAgreesWithAScan is the guard on replacing a scan with a
+// search. Section 14 of engine.md wants the membership test not to be linear,
+// and a binary search answers a different question from a scan the moment its
+// precondition slips, so the two are compared exhaustively over a space small
+// enough to enumerate and varied enough to hold every edge: prefixes of several
+// lengths, subjects shorter than a group, subjects exactly a group's length,
+// and subjects over an alphabet the prefixes do not use.
+func TestPrefixInSortedAgreesWithAScan(t *testing.T) {
+	// Every string over ABC of length 1 to 3, kept when its bytes sum odd, so
+	// the set is neither everything nor an interval.
+	var flat []string
+	var build func(prefix string)
+	build = func(prefix string) {
+		if len(prefix) > 0 {
+			sum := 0
+			for i := 0; i < len(prefix); i++ {
+				sum += int(prefix[i])
+			}
+			if sum%2 == 1 {
+				flat = append(flat, prefix)
+			}
+		}
+		if len(prefix) == 3 {
+			return
+		}
+		for _, c := range "ABC" {
+			build(prefix + string(c))
+		}
+	}
+	build("")
+	slices.Sort(flat)
+	if len(flat) < 10 {
+		t.Fatalf("only %d prefixes; the space is too small to prove anything", len(flat))
+	}
+
+	// Grouped by length, which is what the generator emits. Each group keeps
+	// the order of the sorted list, so each group is sorted.
+	var groups []rt.PrefixGroup
+	for length := 1; length <= 3; length++ {
+		var values []string
+		for _, p := range flat {
+			if len(p) == length {
+				values = append(values, p)
+			}
+		}
+		if !slices.IsSorted(values) {
+			t.Fatalf("group of length %d is not sorted, so the search is unsound", length)
+		}
+		groups = append(groups, rt.PrefixGroup{Length: length, Values: values})
+	}
+
+	scan := func(s string) bool {
+		for _, p := range flat {
+			if strings.HasPrefix(s, p) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Every subject over ABCD of length 0 to 4. D appears in no prefix, so the
+	// space covers misses that sort past the end of a group as well as inside.
+	subjects := []string{""}
+	for range 4 {
+		var next []string
+		for _, s := range subjects {
+			for _, c := range "ABCD" {
+				next = append(next, s+string(c))
+			}
+		}
+		subjects = append(subjects, next...)
+	}
+
+	checked, matched := 0, 0
+	for _, s := range subjects {
+		want := scan(s)
+		if got := rt.Value(s).PrefixInSorted(groups); got != want {
+			t.Fatalf("PrefixInSorted(%q) = %v, a scan says %v", s, got, want)
+		}
+		checked++
+		if want {
+			matched++
+		}
+	}
+	// A space where nothing matches, or everything does, would agree trivially.
+	if matched == 0 || matched == checked {
+		t.Fatalf("%d of %d subjects matched; the comparison is degenerate", matched, checked)
+	}
+	t.Logf("%d prefixes over %d groups, %d subjects, %d matching", len(flat), len(groups), checked, matched)
 }

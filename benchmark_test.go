@@ -258,3 +258,70 @@ func BenchmarkIntrospection(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkMembership measures what a membership test costs, which section 14
+// of engine.md now names as a goal: it must not be linear in the size of the
+// list. The lists were short until the register membership rules landed, and
+// the German one carries 2566 court codes split by length.
+//
+// The cost falls on the refused input, not the valid one. A valid code is found
+// somewhere in the list and a scan stops there; a code that is not in the list
+// is what makes a scan read all of it, and a bench of intact identifiers never
+// shows it. Every value below is a conformance case, named beside it.
+func BenchmarkMembership(b *testing.B) {
+	engine := businessid.New()
+	for _, tc := range []struct {
+		name string
+		in   businessid.Input
+	}{
+		{
+			// siren-valid-001, no membership list on the path at all: the
+			// baseline the ratios below are read against.
+			name: "no list/siren",
+			in:   businessid.Input{Kind: "siren", Value: "012345674"},
+		},
+		{
+			// euid-de-valid-001, a five character court code that exists.
+			name: "found/euid-de-5",
+			in:   businessid.Input{Kind: "euid", Value: "DEF1103.HRB12345"},
+		},
+		{
+			// euid-de-real-003, a six character court code that exists.
+			name: "found/euid-de-6",
+			in:   businessid.Input{Kind: "euid", Value: "DEK1101R.HRB116737"},
+		},
+		{
+			// euid-de-register-unknown-004. Five characters, and Z sorts after
+			// every code in the list, so a scan reads all of it.
+			name: "absent/euid-de-5",
+			in:   businessid.Input{Kind: "euid", Value: "DEZZZZZ.HRB12345"},
+		},
+		{
+			// euid-de-register-longer-than-a-code-005. Six characters, absent
+			// from the six character list.
+			name: "absent/euid-de-6",
+			in:   businessid.Input{Kind: "euid", Value: "DEB1000X.HRB12345"},
+		},
+		{
+			// euid-fr-register-unknown-040. The French list holds 148 greffe
+			// codes, an order of magnitude below the German one, which is what
+			// makes the two comparable as a shape rather than as a number.
+			name: "absent/euid-fr",
+			in:   businessid.Input{Kind: "euid", Value: "FR9999.012345674"},
+		},
+		{
+			// euid-fr-real-042, a greffe code that exists.
+			name: "found/euid-fr",
+			in:   businessid.Input{Kind: "euid", Value: "FR3102.944402676"},
+		},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				if _, err := engine.Validate(tc.in); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
