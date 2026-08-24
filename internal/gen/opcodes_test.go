@@ -1094,6 +1094,24 @@ func TestStructuralRefusals(t *testing.T) {
 			contains: "strictly ascending",
 		},
 		{
+			name: "a prefix set mixing element lengths",
+			mutate: func(b *bundle) {
+				// Sorted, deduplicated, non empty: only the lengths differ.
+				b.programs[1].nodes[27] = pr(pPrefixIn, []uint32{0}, values("AA", "AAA"))
+			},
+			contains: "mixes element lengths",
+		},
+		{
+			name: "a prefix set both out of order and mixing lengths",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[27] = pr(pPrefixIn, []uint32{0}, values("BB", "AAA"))
+			},
+			// Both faults sit inside check 13 and section 10 does not order
+			// them against each other, so the order is this loader's and is
+			// pinned here rather than left to drift.
+			contains: "not strictly ascending",
+		},
+		{
 			name: "an empty value among a prefix set",
 			mutate: func(b *bundle) {
 				b.programs[1].nodes[27] = pr(pPrefixIn, []uint32{0}, values("AA", ""))

@@ -625,3 +625,115 @@ func TestPrefixInSortedAgreesWithAScan(t *testing.T) {
 	}
 	t.Logf("%d prefixes over %d groups, %d subjects, %d matching", len(flat), len(groups), checked, matched)
 }
+
+// TestPrefixInSortedDecidesMixedLengths is the case the corpus cannot carry.
+// Every prefix_in of the shipped bundle holds one length, so no conformance
+// case separates an engine that searches one whole sorted table from one that
+// searches per length, and the first is wrong rather than slow. Section 9 of
+// ir.md now refuses the mixed shape at load, so this table can no longer reach
+// a generated engine; the search is checked against it anyway, because a rule
+// that cannot arrive today is not a rule that answers correctly tomorrow.
+func TestPrefixInSortedDecidesMixedLengths(t *testing.T) {
+	// The example section 9 gives. "AB" is a prefix of "ABCD" and "ABA" is not,
+	// and "ABA" is the greatest element not after "ABCD".
+	flat := []string{"AB", "ABA"}
+	subject := "ABCD"
+
+	// What a single search over the whole table answers: it lands on "ABA",
+	// which is not a prefix, and reports absence. This is the wrong answer,
+	// asserted so that the trap is written down rather than described.
+	i, _ := slices.BinarySearch(flat, subject)
+	nearest := flat[i-1]
+	if nearest != "ABA" {
+		t.Fatalf("the nearest element is %q, so the example no longer illustrates the trap", nearest)
+	}
+	if strings.HasPrefix(subject, nearest) {
+		t.Fatal("the nearest element is a prefix, so the example no longer illustrates the trap")
+	}
+
+	// What this engine answers, one group per length, which is what the
+	// generator emits.
+	groups := []rt.PrefixGroup{
+		{Length: 2, Values: []string{"AB"}},
+		{Length: 3, Values: []string{"ABA"}},
+	}
+	if !rt.Value(subject).PrefixInSorted(groups) {
+		t.Fatal("a per length search must find AB in ABCD")
+	}
+
+	// And the general case, against a scan taken as reference: every subject
+	// over ABC up to length 4, against a table of every string over AB of
+	// length 1 to 3, grouped. A whole table search disagrees with the scan
+	// somewhere in this space; a per length search must not, anywhere.
+	var table []string
+	var build func(string)
+	build = func(p string) {
+		if p != "" {
+			table = append(table, p)
+		}
+		if len(p) == 3 {
+			return
+		}
+		for _, c := range "AB" {
+			build(p + string(c))
+		}
+	}
+	build("")
+	slices.Sort(table)
+
+	var byLength []rt.PrefixGroup
+	for length := 1; length <= 3; length++ {
+		var values []string
+		for _, v := range table {
+			if len(v) == length {
+				values = append(values, v)
+			}
+		}
+		byLength = append(byLength, rt.PrefixGroup{Length: length, Values: values})
+	}
+
+	subjects := []string{""}
+	for range 4 {
+		var next []string
+		for _, s := range subjects {
+			for _, c := range "ABC" {
+				next = append(next, s+string(c))
+			}
+		}
+		subjects = append(subjects, next...)
+	}
+
+	scan := func(s string) bool {
+		for _, p := range table {
+			if strings.HasPrefix(s, p) {
+				return true
+			}
+		}
+		return false
+	}
+	wholeTable := func(s string) bool {
+		j, _ := slices.BinarySearch(table, s)
+		if j == 0 {
+			return false
+		}
+		return strings.HasPrefix(s, table[j-1])
+	}
+
+	wrong := 0
+	for _, s := range subjects {
+		want := scan(s)
+		if got := rt.Value(s).PrefixInSorted(byLength); got != want {
+			t.Errorf("per length search on %q = %v, a scan says %v", s, got, want)
+		}
+		if wholeTable(s) != want {
+			wrong++
+		}
+	}
+	// If a whole table search happened to agree everywhere, this space would
+	// prove nothing about the difference between the two designs.
+	if wrong == 0 {
+		t.Fatal("a whole table search agrees everywhere here, so the space does not separate the designs")
+	}
+	t.Logf("%d subjects, %d of them answered wrongly by a whole table search, none by a per length one",
+		len(subjects), wrong)
+}
