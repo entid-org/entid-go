@@ -845,3 +845,67 @@ func TestCheckOrderFollowsSection10(t *testing.T) {
 		t.Fatalf("diagnostic %q does not name the category rule", err)
 	}
 }
+
+// TestDeadWhenBranchIsRefused covers the half of check 16 a parent scan cannot
+// see. CHECKSUM_OP_KIND_WHEN is accepted only as a direct operand of CHOOSE,
+// because its non applicable state is observable nowhere else. Enforcing that
+// by looking at a node's parents passes a node that has none: section 2 permits
+// a node no root reaches, so a WHEN nothing references was accepted while the
+// rule, read as written, refuses it.
+//
+// The program root stays out of the scan. root_node is a reference, and a
+// program rooted in a WHEN has its own rule and its own message.
+func TestDeadWhenBranchIsRefused(t *testing.T) {
+	// Node 18 is a predicate and node 13 a checksum outcome, so the WHEN built
+	// from them is well typed and fails only on where it sits.
+	for _, tc := range []struct {
+		name     string
+		mutate   func(*prog)
+		contains string
+	}{
+		{
+			name: "nothing references it",
+			mutate: func(p *prog) {
+				p.nodes = append(p.nodes, ck(xWhen, []uint32{18, 13}))
+			},
+			contains: "is a WHEN branch that nothing references",
+		},
+		{
+			name: "consumed by something that is not CHOOSE",
+			mutate: func(p *prog) {
+				p.nodes = append(p.nodes,
+					ck(xWhen, []uint32{18, 13}),
+					ck(xAll, []uint32{31}),
+				)
+				p.root = 32
+			},
+			contains: "is a WHEN branch consumed by",
+		},
+		{
+			name: "the program root keeps its own message",
+			mutate: func(p *prog) {
+				p.nodes = append(p.nodes, ck(xWhen, []uint32{18, 13}))
+				p.root = 31
+			},
+			contains: "has a WHEN branch as its root",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := allOpcodesBundle()
+			tc.mutate(&b.programs[3])
+			_, err := gen.Load(b.encode())
+			if !errors.Is(err, gen.ErrInvalidRuleset) {
+				t.Fatalf("got %v, want invalid_ruleset", err)
+			}
+			if !strings.Contains(err.Error(), tc.contains) {
+				t.Fatalf("diagnostic %q does not mention %q", err, tc.contains)
+			}
+		})
+	}
+
+	// The bundle without the mutation still loads, so the cases above fail on
+	// the WHEN and on nothing else.
+	if _, err := gen.Load(allOpcodesBundle().encode()); err != nil {
+		t.Fatalf("the unmutated bundle must load: %v", err)
+	}
+}

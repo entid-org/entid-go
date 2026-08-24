@@ -661,15 +661,30 @@ func (v *validator) checkCategory(p *Program, i int, n *Node) error {
 		return invalidf("program %d node %d uses %s in a pre-canonicalization program", p.ID, i, n.Op)
 	}
 	if n.Op == OpChecksumWhen {
-		// A WHEN branch is only observable as a direct operand of CHOOSE.
+		// A WHEN branch is only observable as a direct operand of CHOOSE, so a
+		// branch nothing reaches is refused as well. Reading the rule off a
+		// node's parents alone misses that case: section 2 permits a node no
+		// root reaches, and a node with no parent has none to inspect.
+		//
+		// The root is excluded from the scan because root_node is a reference
+		// like any other. A program rooted in a WHEN is refused by the root
+		// rule below, which says so in its own words.
+		referenced := int(p.RootNode) == i
 		for k := i + 1; k < len(p.Nodes); k++ {
 			consumer := p.Nodes[k]
 			for _, in := range consumer.InputNodes {
-				if int(in) == i && consumer.Op != OpChoose {
+				if int(in) != i {
+					continue
+				}
+				referenced = true
+				if consumer.Op != OpChoose {
 					return invalidf("program %d node %d is a WHEN branch consumed by %s instead of CHOOSE",
 						p.ID, i, consumer.Op)
 				}
 			}
+		}
+		if !referenced {
+			return invalidf("program %d node %d is a WHEN branch that nothing references", p.ID, i)
 		}
 	}
 	return nil
