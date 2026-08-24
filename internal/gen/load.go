@@ -456,6 +456,25 @@ func (v *validator) checkBounds(p *Program, i int, n *Node, bounds []int) error 
 				return where("prefix_in values are not strictly ascending")
 			}
 		}
+		// Section 9 requires every element to share one length. Over a single
+		// sorted list of mixed lengths, a search for the greatest element not
+		// after the subject answers wrongly rather than slowly: against
+		// "ABCD" a list of ["AB", "ABA"] yields "ABA", which is not a prefix,
+		// while "AB" is. At one length, starting with an element is equalling
+		// its opening of that length, which a search decides exactly. A rule
+		// needing several lengths writes one prefix_in per length under an
+		// any(), which the German register rule already does.
+		//
+		// No published rule carries the mixed shape, so no conformance case
+		// can separate an engine that gets this right from one that does not;
+		// the bundle is refused the shape instead.
+		for k, val := range n.Values {
+			if k > 0 && len(val) != len(n.Values[0]) {
+				return where(fmt.Sprintf(
+					"prefix_in mixes element lengths, %d and %d, which no single search can decide",
+					len(n.Values[0]), len(val)))
+			}
+		}
 	case OpWeightedSum:
 		switch n.Alignment {
 		case AlignLeft, AlignRight, AlignCycle:

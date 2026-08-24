@@ -5,10 +5,10 @@
 # release exists, the downstream pull request replaces this file with an
 # attested one, and the generator resolves the bundle from that release
 # instead of the local copy under spec/.
-rules_version = "2026.09.0"
+rules_version = "2026.09.2"
 format_version = 1
-rules_sha256 = "53caed2dbca89bebedc2c2fbb7fc37b666b0b2be4c75b878fef82c835c251392"
-conformance_sha256 = "5a453eb0aa87f402c3e7a3afc9e77775b2aee16df751caef352e72b7353488da"
+rules_sha256 = "8e27cba7f5c03e2885428e3f603f114f6e11026b063ca18f3c5e1e8ea8d4107e"
+conformance_sha256 = "2b1428c732be07c871038d895157c6b9666f925977fa8048ba335d0cacc353f0"
 # The JSONL is shipped decompressed, so its digest is taken on what lands in
 # spec/ rather than on the archive. It went unlisted for a while: an engine
 # could not verify it, verify-lock.sh would not have noticed a drift, and
@@ -23,11 +23,11 @@ conformance_sha256 = "5a453eb0aa87f402c3e7a3afc9e77775b2aee16df751caef352e72b735
 # reviewed source and carries no rules version, while the compiled corpus injects
 # one into every expected report. A version bump alone moves one and not the
 # other. Both measured by the Swift engine, on the release archive.
-conformance_jsonl_sha256 = "3691a6c4344a6d29f4eb27d707112db5c4bad0ad8ed9559484cdcc094b1e21d6"
+conformance_jsonl_sha256 = "448b293eb13b01962c9acc021fce63209aa988a103fc5688a2c8b900e0084ff5"
 rules_proto_sha256 = "40c4472007251677dfc3df287188dba177cab6ab62b6d9546e05e89291a77465"
 conformance_proto_sha256 = "600b40465a71450ca452b26beae99dafcef43cda8b4e7dbe7e32d7b70e5c2a6e"
 testee_proto_sha256 = "7209846f3dc2f2f43da537f9ef74f1beee6a02be612ab53594220e997acf3dbc"
-ir_doc_sha256 = "14593d1e03e182d080557af5e596c60b5a7e96a27408917c9d610c6d01b6b302"
+ir_doc_sha256 = "710f3dca7650fff2f964de344e802c588644977678c61e658159960ff7a6cdd3"
 features_doc_sha256 = "1cb41bff278f1606f0215ccac387c92abf7ec2bdcc7683be93b52c9291f3689a"
 stability = "alpha"
-source_commit = "d135bdf0f1a81eb273aed6f2c7ea799368fd7480"
+source_commit = "440ff88b95a603b2baf7be4ff7e5242c8541fa77"
