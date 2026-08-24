@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	rt "github.com/libbusinessid/businessid-go/internal/runtime"
 )
@@ -736,4 +737,57 @@ func TestPrefixInSortedDecidesMixedLengths(t *testing.T) {
 	}
 	t.Logf("%d subjects, %d of them answered wrongly by a whole table search, none by a per length one",
 		len(subjects), wrong)
+}
+
+// TestPrefixInSortedGroupsByBytes pins the unit. Section 9 of ir.md states the
+// single element length of a prefix_in in UTF-8 bytes, because the search is
+// over bytes, and notes that two elements of one byte length may differ in code
+// points: PZ and é are both two bytes and are not both two code points. No
+// conformance case separates the two readings, since every element of the
+// published bundle is ASCII, where they agree.
+//
+// This search slices bytes and compares bytes, so the byte reading is the one
+// it implements. What that has to be worth is agreement with the definition
+// taken literally, which is what the reference below is.
+func TestPrefixInSortedGroupsByBytes(t *testing.T) {
+	const pz, eacute = "PZ", "é"
+	if len(pz) != 2 || len(eacute) != 2 {
+		t.Fatalf("the example needs two elements of two bytes, got %d and %d", len(pz), len(eacute))
+	}
+	if utf8.RuneCountInString(pz) == utf8.RuneCountInString(eacute) {
+		t.Fatal("the example needs the two to differ in code points, or it pins nothing")
+	}
+
+	// Sorted by bytes, which is the order the loader requires and the order a
+	// search needs: 0x50 before 0xC3.
+	values := []string{pz, eacute}
+	if !slices.IsSorted(values) {
+		t.Fatal("the group is not sorted, so the search is unsound")
+	}
+	groups := []rt.PrefixGroup{{Length: 2, Values: values}}
+
+	scan := func(s string) bool {
+		for _, p := range values {
+			if strings.HasPrefix(s, p) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, subject := range []string{
+		"PZAB", "PZ", "éX", eacute, "P", "", "PA", "Pé", "ée", "\xc3", "\xc3\xa9\xc3",
+	} {
+		want := scan(subject)
+		if got := rt.Value(subject).PrefixInSorted(groups); got != want {
+			t.Errorf("PrefixInSorted(%q) = %v, the definition says %v", subject, got, want)
+		}
+	}
+
+	// The case the two readings would disagree on if the search grouped by code
+	// points while calling the count a byte length: "Pé" opens with one byte of
+	// PZ and one of é and is a prefix of neither.
+	if rt.Value("Pé").PrefixInSorted(groups) {
+		t.Error("a subject sharing no whole element must not match")
+	}
 }
