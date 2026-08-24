@@ -570,6 +570,10 @@ Capabilities: `CORE_GRAPH_V1` (1), `FORMAT_ASSERTIONS_V1` (20).
 
 True when `expr` is present and starts with at least one element of `values`. `values` is non empty, sorted and deduplicated by the compiler, and every element is non empty. Every element has the same length, and a bundle mixing lengths is refused: over one sorted list of mixed lengths, a search for the greatest element not after `expr` answers wrongly rather than slowly, since `["AB", "ABA"]` against `"ABCD"` finds `ABA`, which is not a prefix, while `AB` is. At one length, starting with an element is equalling its opening of that length, so the search is exact. Mixed lengths are written as one `prefix_in` per length under an `any`.
 
+That refusal takes the evidence with it. Every `prefix_in` a bundle may now carry holds one length, so no conformance case can distinguish a search run per length from one run over the whole table: the shape that separates them is the shape the loader refuses. An engine MUST therefore pin the semantics below its loader, by a native test comparing its search against the definition transcribed literally -- some element is a prefix of the subject -- over tables of mixed lengths. This is the second rule the corpus cannot carry, alongside `invalid_encoding`, and for the same kind of reason: what makes a case expressible and what makes a rule worth stating are not the same thing.
+
+The unit is bytes because the search is over bytes, and an engine working in another unit may group more finely without contradicting this: two elements of the same byte length can differ in code points, since `PZ` and `é` are both two bytes and are not both two code points. A finer grouping refuses nothing this accepts. No conformance case separates the two readings, because every element of the published bundle is ASCII, where they agree.
+
 #### `PREDICATE_OP_KIND_CHAR_AT_IN`
 
 Surface syntax: `char_at_in(expr, index, chars)`.
@@ -1318,7 +1322,7 @@ An engine performs these checks, in this order, before executing anything:
 10. every operation known, with its declared output type
 11. operand count, operand types and strictly lower operand indices
 12. only the parameters the operation declares, and every required parameter
-13. arithmetic bounds: moduli, weights, remainder tables, indices, provable integer widths and the alphabet of a custom mapping, and the declared order of a parameter list as section 9 states it
+13. arithmetic bounds: moduli, weights, remainder tables, indices, provable integer widths and the alphabet of a custom mapping, and the shape of a parameter list: the order section 9 states, then the single element length of a `prefix_in`, in that order
 14. expansion within the evaluation budget once repeated operands are inlined
 15. root, subject and capture nodes inside the program, correctly typed, and a subject node that does not read the subject it defines
 16. program shape: the accepted root and the accepted operation categories of the kind, both as section 2 states them, `WHEN` only inside `CHOOSE`, and a pre-canonicalization program restricted to its five permitted operations

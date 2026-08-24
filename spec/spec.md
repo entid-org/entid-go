@@ -938,7 +938,16 @@ pour faciliter le debug et couverte par un test d’équivalence.
 ### 7.4 Version et fonctionnalités
 
 `format_version` versionne la structure et les invariants de l’IR.
-`rules_version` versionne les données métier et suit `YYYY.MM.PATCH`.
+`rules_version` versionne les données métier et suit `YYYY.MM.PATCH`. `YYYY.MM` est
+l'année et le mois où les données ont été coupées ; `PATCH` est un compteur dans ce
+mois, **sans borne supérieure**. `2026.08.31` est donc suivi de `2026.08.32`, pas de
+`2026.09.0` : le troisième champ n'est pas un jour, et quatre versions ont annoncé
+septembre en plein mois d'août pour l'avoir pris pour un.
+
+`tools/next_rules_version.sh` la calcule depuis toutes les valeurs que le fichier a
+portées, donc il ne peut ni basculer de mois par erreur ni réutiliser une version
+qu'un moteur a déjà épinglée. Un test refuse par ailleurs une version nommant un mois
+qui n'a pas commencé, jugé sur la date du commit et jamais sur l'horloge.
 
 `required_feature_ids` énumère toutes les primitives nécessaires. Chaque moteur
 publie la liste des fonctionnalités supportées. Le chargement échoue si un seul ID

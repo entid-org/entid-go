@@ -848,6 +848,31 @@ Lorsque l’écosystème le permet, appliquer le mutation testing aux checksums,
 comparaisons de positions, bornes et dispatch. Objectif recommandé : mutation score
 ≥ 80 % sur le cœur, avec analyse des mutants survivants.
 
+## 12.5 Une seule commande, silencieuse quand tout passe
+
+Chaque moteur expose **un point d'entrée unique** qui exécute toute sa vérification :
+empreintes du lock, régénération du code émis, compilation, tests, conformité contre
+le runner de `spec`, lint, format, couverture et seuils, packaging. Le nom est libre —
+`make verify`, `./tools/verify.sh`, `./gradlew verify` — mais le contrat ne l'est pas :
+
+- **succès : une seule ligne**, portant les chiffres qui comptent (cas de conformité,
+  couverture, taille livrée) et rien d'autre ;
+- **échec : la sortie de l'étape qui a échoué, et d'elle seule**, précédée de son nom ;
+- code de retour non nul dès qu'une étape échoue, jamais avalé.
+
+La raison n'est pas l'esthétique. Un tour de resynchronisation exécuté en trente
+commandes fait passer trente sorties complètes dans le contexte de qui le conduit,
+dont vingt-neuf ne disent rien d'autre que « ça passe ». Le coût est réel, il croît
+avec le nombre de moteurs, et il décourage précisément ce qu'on veut voir fait
+souvent. Une commande qui se tait quand tout va bien rend la vérification complète
+moins chère que la vérification partielle.
+
+Le point d'entrée est aussi ce que la CI appelle, pour qu'il n'existe jamais deux
+définitions de « vert » — celle du développeur et celle de l'intégration.
+
+Cette règle appartient au `CLAUDE.md` du dépôt moteur, pas seulement à sa
+documentation : elle s'adresse à qui va exécuter, pas à qui va lire.
+
 ## 13. Concurrence et état
 
 - moteur immuable après construction ;
