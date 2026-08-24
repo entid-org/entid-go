@@ -623,15 +623,87 @@ func (g *generator) emitTables() {
 			}
 		}
 	}
-	if len(tables) == 0 {
-		return
-	}
 	sort.Slice(tables, func(i, j int) bool { return tables[i].name < tables[j].name })
 	for _, t := range tables {
 		g.p("// %s is the %s.", t.name, t.comment)
 		g.p("var %s = [%d]int64{%s}", t.name, len(t.values), joinInt64(t.values))
 		g.p("")
 	}
+	g.emitPrefixSets()
+}
+
+// emitPrefixSets writes the accepted prefixes of every prefix_in node, once,
+// grouped by byte length and sorted inside each group.
+//
+// Section 14 of engine.md requires a membership test not to be linear in the
+// size of the list, and the register rules brought lists of 2566 entries. A
+// list written at the call site would be rebuilt on every validation before a
+// single comparison; written here it lives in the package and is searched.
+//
+// Nothing is reordered. Section 10 of ir.md requires the values of a prefix_in
+// to be strictly ascending and the loader refuses a bundle where they are not,
+// so selecting the values of one length preserves the order they arrived in.
+func (g *generator) emitPrefixSets() {
+	type set struct {
+		name    string
+		comment string
+		values  []string
+	}
+	var sets []set
+	for _, p := range g.bundle.Programs {
+		e := &emitter{bundle: g.bundle, names: g.names, prog: p}
+		for i, n := range p.Nodes {
+			if n.Op != OpPrefixIn {
+				continue
+			}
+			sets = append(sets, set{
+				name:    e.prefixSetName(uint32(i)),
+				comment: fmt.Sprintf("accepted prefixes of %s node %d", g.names.Program(p.ID), i),
+				values:  n.Values,
+			})
+		}
+	}
+	sort.Slice(sets, func(i, j int) bool { return sets[i].name < sets[j].name })
+
+	for _, s := range sets {
+		// One group per distinct byte length, in ascending length order. The
+		// values of a group keep the relative order of the bundle, which is
+		// ascending, so each group is sorted without being sorted here.
+		byLength := map[int][]string{}
+		var lengths []int
+		for _, v := range s.values {
+			if _, seen := byLength[len(v)]; !seen {
+				lengths = append(lengths, len(v))
+			}
+			byLength[len(v)] = append(byLength[len(v)], v)
+		}
+		sort.Ints(lengths)
+
+		g.p("// %s are the %s, %d values over %d length %s.",
+			s.name, s.comment, len(s.values), len(lengths), plural(len(lengths), "group", "groups"))
+		g.p("var %s = []rt.PrefixGroup{", s.name)
+		for _, l := range lengths {
+			values := byLength[l]
+			g.p("\t{Length: %d, Values: []string{", l)
+			// Wrapped so that no line carries the whole list: a single line of
+			// 2566 literals is unreadable and unreviewable.
+			const perLine = 8
+			for start := 0; start < len(values); start += perLine {
+				end := min(start+perLine, len(values))
+				g.p("\t\t%s,", joinQuoted(values[start:end]))
+			}
+			g.p("\t}},")
+		}
+		g.p("}")
+		g.p("")
+	}
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 func joinInt64(vs []int64) string {

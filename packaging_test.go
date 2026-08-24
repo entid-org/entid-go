@@ -381,3 +381,42 @@ func TestCoverageGateIsDeclared(t *testing.T) {
 		}
 	}
 }
+
+// TestThePublishedPackageNeedsNoInitialization asserts what the engine claims
+// about start-up: the rules are laid out by the compiler, not built when the
+// program starts. A package that needs initialization gets an inittask symbol,
+// and this one must not have any.
+//
+// The membership tables of the register rules are the reason this is asserted
+// rather than assumed. They are package level slice literals, and a slice
+// literal does cost start-up work when its elements are not constants; these
+// are constants, so the compiler lays them out statically. That is a claim
+// about a compiler, which makes it a thing to measure.
+func TestThePublishedPackageNeedsNoInitialization(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "consumer")
+	build := exec.Command(goTool(t), "build", "-o", binary, "./cmd/businessid-demo")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build a consumer of the package: %v\n%s", err, out)
+	}
+	out, err := exec.Command(goTool(t), "tool", "nm", binary).Output()
+	if err != nil {
+		t.Fatalf("go tool nm: %v", err)
+	}
+	symbols := string(out)
+
+	// The control: a standard library package that does need initialization.
+	// Without it, a binary whose symbols could not be read at all would look
+	// like a binary that initializes nothing.
+	if !strings.Contains(symbols, "unicode..inittask") {
+		t.Fatal("no inittask symbol of any kind was found, so the absence of ours proves nothing")
+	}
+	const module = "github.com/libbusinessid/businessid-go"
+	for _, line := range strings.Split(symbols, "\n") {
+		if !strings.Contains(line, "inittask") {
+			continue
+		}
+		if strings.Contains(line, module) {
+			t.Errorf("the package initializes at start-up: %s", strings.TrimSpace(line))
+		}
+	}
+}

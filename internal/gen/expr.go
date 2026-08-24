@@ -119,7 +119,11 @@ func (e *emitter) predExpr(idx uint32) string {
 	case OpEndsWith:
 		return fmt.Sprintf("%s.HasSuffix(%s)", str(0), quote(n.Text))
 	case OpPrefixIn:
-		return fmt.Sprintf("%s.PrefixIn(%s)", str(0), joinQuoted(n.Values))
+		// The values are emitted once, as a package level table grouped by
+		// length, and searched rather than scanned: section 14 of engine.md
+		// requires a membership test not to be linear in the size of the list,
+		// and writing the list at the call site would rebuild it per call.
+		return fmt.Sprintf("%s.PrefixInSorted(%s)", str(0), e.prefixSetName(idx))
 	case OpCharAtIn:
 		return fmt.Sprintf("%s.CharAtIn(%d, %s)", str(0), n.Index, quote(n.Text))
 	case OpContains:
@@ -181,6 +185,11 @@ func (e *emitter) intExpr(idx uint32) string {
 
 // weightsName and remainderName address the static tables emitted beside the
 // program, one per node that needs one.
+// prefixSetName names the table of accepted prefixes of one prefix_in node.
+func (e *emitter) prefixSetName(idx uint32) string {
+	return fmt.Sprintf("prefixes%s%d", capitalize(e.names.Program(e.prog.ID)), idx)
+}
+
 func (e *emitter) weightsName(idx uint32) string {
 	return fmt.Sprintf("weights%s%d", capitalize(e.names.Program(e.prog.ID)), idx)
 }

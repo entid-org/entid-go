@@ -229,7 +229,7 @@ func TestEveryOpcodeLoadsAndGenerates(t *testing.T) {
 		".LengthIn(3, 12, 20)", ".LengthBetween(1, 64)",
 		".ASCIIDigits()", ".ASCIIUpperLetters()", ".ASCIIAlphanumeric()",
 		`.ASCIICharset("XYZ")`, `.HasPrefix("P")`, `.HasSuffix("S")`,
-		`.PrefixIn("AA", "PP")`, `.CharAtIn(0, "PX")`, `.Contains(".")`,
+		".PrefixInSorted(prefixes", `.CharAtIn(0, "PX")`, `.Contains(".")`,
 		"c.profile == Compatible", " && ", " || ", "!",
 		// Integers.
 		"rt.DigitsToInteger(", "rt.ModDigits(", "rt.WeightedSum(",

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -111,12 +112,22 @@ func TestGeneratedCodeCoversEveryRule(t *testing.T) {
 	if strings.Contains(code, "map[") {
 		t.Error("the generated code builds a map, which costs work at start-up")
 	}
-	// Slice literals at package level are initialized at start-up; arrays are
-	// not. Only coverageTable, which is a function body, may build one.
+	// A package level slice literal whose elements are not all constants is
+	// built at start-up; one whose elements are constants is laid out
+	// statically by the compiler and costs nothing. The membership tables are
+	// the second kind, which was measured rather than assumed: a binary
+	// linking this package carries no inittask symbol for it at all, while
+	// unicode..inittask is present in the same binary. That property is
+	// asserted directly by TestThePublishedPackageNeedsNoInitialization; here
+	// the shape is checked, and only the membership tables may be slices.
 	for _, line := range strings.Split(code, "\n") {
-		if strings.HasPrefix(line, "var ") && strings.Contains(line, "= []") {
-			t.Errorf("package level slice literal is built at start-up: %s", line)
+		if !strings.HasPrefix(line, "var ") || !strings.Contains(line, "= []") {
+			continue
 		}
+		if strings.HasPrefix(line, "var prefixes") && strings.HasSuffix(line, "= []rt.PrefixGroup{") {
+			continue
+		}
+		t.Errorf("package level slice literal is built at start-up: %s", line)
 	}
 }
 
@@ -205,4 +216,42 @@ func TestRulesVersionShape(t *testing.T) {
 			t.Errorf("version %q: got %v, want invalid_ruleset", tc.version, err)
 		}
 	}
+}
+
+// TestMembershipTestsAreSearchedNotScanned pins the goal section 14 of
+// engine.md added: a membership test must not be linear in the size of the
+// list. The lists were short until the register membership rules landed; the
+// German one now carries 2566 court codes, and a scan of it falls on the
+// refused input, which is the input a bench of valid identifiers never covers.
+//
+// Two things are asserted, because a scan can hide in either. The call must be
+// the searched form, and its argument must be a name rather than a literal
+// list: a variadic call written out at the call site rebuilds the whole slice
+// on every validation, which is linear work before a single comparison.
+func TestMembershipTestsAreSearchedNotScanned(t *testing.T) {
+	bundle, err := gen.Load(readSpecFile(t, "businessid-rules.binpb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := gen.Generate(bundle, "businessid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(src)
+
+	if strings.Contains(text, ".PrefixIn(") {
+		t.Error("the emitted code still scans a membership list linearly")
+	}
+	calls := regexp.MustCompile(`\.PrefixInSorted\(([^)]*)\)`).FindAllStringSubmatch(text, -1)
+	if len(calls) == 0 {
+		t.Fatal("the emitted code performs no membership test at all, so nothing was checked")
+	}
+	name := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	for _, call := range calls {
+		if !name.MatchString(call[1]) {
+			t.Errorf("a membership test is passed %q, which is built at the call site rather than once",
+				call[1])
+		}
+	}
+	t.Logf("%d membership tests, all searched", len(calls))
 }
