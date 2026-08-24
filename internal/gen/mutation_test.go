@@ -319,16 +319,16 @@ func mutantsOf(t *testing.T, label string, raw []byte, perFamily, perNested int)
 				continue
 			}
 			body := splice(raw)
-			tag := uint64(s.field)<<3 | uint64(wire)
-			w := 0
-			for v := tag; ; v >>= 7 {
+			// The tag varint keeps its width: the width follows the field
+			// number, and only the low three bits change.
+			v := uint64(s.field)<<3 | uint64(wire)
+			for w := 0; ; w++ {
 				if v < 0x80 {
 					body[s.tag+w] = byte(v)
-					w++
 					break
 				}
 				body[s.tag+w] = byte(v) | 0x80
-				w++
+				v >>= 7
 			}
 			out = append(out, mutant{
 				fmt.Sprintf("%s/field %d at depth %d carries wire type %d instead of %d",
