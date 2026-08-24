@@ -9,7 +9,10 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # One job calling one entry point. Section 12.5 of engine.md asks for a single
+  # verification so that "green" cannot mean one thing here and another on a
+  # developer's machine: what CI runs is `make verify`, and nothing else.
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -18,150 +21,17 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Verify the bundle against rules.lock
-        run: |
-          declared=$(grep '^rules_sha256' rules.lock | cut -d'"' -f2)
-          actual=$(sha256sum spec/businessid-rules.binpb | cut -d' ' -f1)
-          if [ "$declared" != "$actual" ]; then
-            echo "bundle digest $actual does not match the $declared declared in rules.lock" >&2
-            exit 1
-          fi
-
-      - name: Check that the generated rules are up to date
-        run: |
-          go generate ./...
-          git diff --exit-code -- rules_gen.go
-
-      # The published artifact is a module zip, not a package: it carries every
-      # file under the module root, so go list -deps cannot see this. spec/ was
-      # 1 095 540 bytes of bundle, corpus and JSONL landing in every consumer's
-      # module cache for code that never opens any of it; spec/go.mod makes the
-      # directory a module of its own, which the parent's zip excludes.
-      #
-      # This opens the zip a consumer would actually download. GOPRIVATE sends
-      # the go command straight to the repository instead of the proxy, so it
-      # builds the zip itself from the commit under test, with no waiting for a
-      # proxy to observe the branch and nothing published to the checksum
-      # database.
-      - name: The published module zip carries no rule or corpus data
-        env:
-          GOPRIVATE: github.com/libbusinessid/businessid-go
-          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          module=github.com/libbusinessid/businessid-go
-          zip=$(go mod download -json "$module@$SHA" | grep -o '"Zip": *"[^"]*"' | head -1 | cut -d'"' -f4)
-          test -n "$zip" || { echo "go mod download reported no zip for $SHA" >&2; exit 1; }
-          echo "opened $zip"
-          unzip -l "$zip" | tail -3
-          if unzip -l "$zip" | grep -E '/spec/|\.binpb|\.jsonl' ; then
-            echo "rule or corpus data travels in the published module" >&2
-            exit 1
-          fi
-          echo "no rule or corpus data in the published module zip"
-
-      - name: Format
-        run: |
-          gofmt -l . | tee /tmp/unformatted
-          test ! -s /tmp/unformatted
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test -race ./...
-
-      # Section 12.2 of engine.md: the threshold covers hand written code -
-      # the engine, its primitives, its API, its generator. rules_gen.go is
-      # emitted from the bundle and its coverage measures the corpus rather
-      # than this engine, so it is published and never gated. cmd/businessid-
-      # demo is excluded for a different reason: its whole body is a main that
-      # calls os.Exit, which no test binary can enter, so it is verified as a
-      # process by cmd/businessid-demo/main_test.go instead. Both exclusions
-      # are asserted by TestCoverageGateIsDeclared.
-      - name: Coverage of hand-written code
-        run: |
-          go test ./... -coverprofile=coverage.out -covermode=atomic -coverpkg=./... -timeout 600s
-          awk 'NR > 1 {
-                 if ($1 ~ /rules_gen\.go/) next
-                 if ($1 ~ /cmd\/businessid-demo/) next
-                 stmt[$1] = $2
-                 if ($3 > 0) hit[$1] = 1
-               }
-               END {
-                 for (block in stmt) {
-                   total += stmt[block]
-                   if (block in hit) covered += stmt[block]
-                 }
-                 if (total == 0) {
-                   print "the profile carries no hand-written block" > "/dev/stderr"
-                   exit 1
-                 }
-                 pct = 100 * covered / total
-                 printf "hand-written coverage: %d/%d statements, %.2f%%\n", covered, total, pct
-                 if (pct < 95.0) {
-                   printf "below the 95%% gate of engine.md section 12.2\n" > "/dev/stderr"
-                   exit 1
-                 }
-               }' coverage.out
-          awk 'NR > 1 && $1 ~ /rules_gen\.go/ {
-                 stmt[$1] = $2
-                 if ($3 > 0) hit[$1] = 1
-               }
-               END {
-                 for (block in stmt) {
-                   total += stmt[block]
-                   if (block in hit) covered += stmt[block]
-                 }
-                 if (total > 0) {
-                   printf "generated rules, published not gated: %d/%d statements, %.2f%%\n", covered, total, 100 * covered / total
-                 }
-               }' coverage.out
-
-      - name: Fuzz smoke tests
-        run: |
-          go test ./internal/gen -run FuzzLoad -fuzz FuzzLoad -fuzztime 30s
-          go test . -run FuzzValidate -fuzz FuzzValidate -fuzztime 30s
-
-  conformance:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-
-      - name: Build the testee
-        run: go build -o bin/businessid-testee ./cmd/businessid-testee
-
-      # Section 8.7 of spec.md: the runner comes from the spec repository and
-      # nowhere else, pinned to the commit rules.lock records under
-      # source_commit - the same commit as the corpus, so that a comparator can
-      # never judge a corpus it was not written for. It is a build tool: it
-      # enters neither the published package nor its dependencies.
-      - name: Conformance
-        # Section 8.7 of spec.md and section 11 of engine.md require this:
-        # setup-go pins GOTOOLCHAIN to local, the spec module declares a newer
-        # toolchain than this one pins, and without the override the step fails
-        # on toolchain resolution rather than on a conformance difference. The
-        # testee above stays built with the toolchain go.mod names, because
-        # that is what ships; the runner is a build tool from another module.
+      # The linter floats rather than being pinned, on a finding worth keeping:
+      # a CI linter one release ahead of the local one caught a dead store that
+      # the pinned one did not. It is fetched through the module proxy, so the
+      # checksum database vouches for what is installed. GOTOOLCHAIN is auto
+      # here and for the runner because both are build tools from modules that
+      # ask for a newer Go than this one pins; what ships is still built with
+      # the toolchain go.mod names.
+      - name: Install the linter
         env:
           GOTOOLCHAIN: auto
-        run: |
-          commit=$(grep '^source_commit' rules.lock | cut -d'"' -f2)
-          test -n "$commit" || { echo "rules.lock records no source_commit" >&2; exit 1; }
-          go run "github.com/libbusinessid/spec/cmd/conformance-runner@$commit" \
-            -corpus spec/businessid-conformance.binpb -- ./bin/businessid-testee
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      - name: Verify
+        run: make verify

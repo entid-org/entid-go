@@ -5,10 +5,10 @@
 # release exists, the downstream pull request replaces this file with an
 # attested one, and the generator resolves the bundle from that release
 # instead of the local copy under spec/.
-rules_version = "2026.09.2"
+rules_version = "2026.08.32"
 format_version = 1
-rules_sha256 = "8e27cba7f5c03e2885428e3f603f114f6e11026b063ca18f3c5e1e8ea8d4107e"
-conformance_sha256 = "2b1428c732be07c871038d895157c6b9666f925977fa8048ba335d0cacc353f0"
+rules_sha256 = "f442af5aedc8b4b82aae701983c49b88649fd825433e5b74e2c72e686356170d"
+conformance_sha256 = "43b6299e1afd69da913a06285db1aa9e7fda2c98c94ea2887e58253999b122a3"
 # The JSONL is shipped decompressed, so its digest is taken on what lands in
 # spec/ rather than on the archive. It went unlisted for a while: an engine
 # could not verify it, verify-lock.sh would not have noticed a drift, and
@@ -27,7 +27,7 @@ conformance_jsonl_sha256 = "448b293eb13b01962c9acc021fce63209aa988a103fc5688a2c8
 rules_proto_sha256 = "40c4472007251677dfc3df287188dba177cab6ab62b6d9546e05e89291a77465"
 conformance_proto_sha256 = "600b40465a71450ca452b26beae99dafcef43cda8b4e7dbe7e32d7b70e5c2a6e"
 testee_proto_sha256 = "7209846f3dc2f2f43da537f9ef74f1beee6a02be612ab53594220e997acf3dbc"
-ir_doc_sha256 = "710f3dca7650fff2f964de344e802c588644977678c61e658159960ff7a6cdd3"
+ir_doc_sha256 = "9d104c7122cde69819bdd83f7a0c07acd0be6e7c9fc7f142e46626194ddc176e"
 features_doc_sha256 = "1cb41bff278f1606f0215ccac387c92abf7ec2bdcc7683be93b52c9291f3689a"
 stability = "alpha"
-source_commit = "440ff88b95a603b2baf7be4ff7e5242c8541fa77"
+source_commit = "4bf7699eadbe962ef0b439e95a4433b7b572a027"
