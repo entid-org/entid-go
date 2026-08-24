@@ -1164,6 +1164,17 @@ these rules today. They are normative regardless.
 
 1. Reject a raw input longer than 1024 UTF-8 bytes with format
    `unsupported`/`input_too_long` and checksum `not_run`/`not_run_format_unsupported`.
+
+   The bound counts the bytes of the input's UTF-8 encoding. Text that is not
+   well formed has no such encoding, and this step runs before the one that
+   refuses it, so the count would have to be invented: a Java or Kotlin string
+   holding one unpaired surrogate encodes to a single replacement byte through
+   the platform encoder, and to three through the encoding that surrogate would
+   have had. An engine whose string type admits ill formed text therefore
+   chooses, and MUST state which: count what its own encoder produces, or
+   refuse the input as `invalid_encoding` before measuring it. Both answers are
+   `unsupported`, no conformance case can carry such an input, and the choice
+   only shows on text that is both ill formed and near the bound.
 2. Run the dispatch algorithm of section 5, each canonicalization phase at most once.
 3. `country_mismatch` produces format `invalid`/`country_mismatch` and checksum
    `not_run`/`not_run_format_invalid`.
