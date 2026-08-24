@@ -870,7 +870,25 @@ Objectifs non normatifs mais testés en régression :
 - aucune compilation de regex ;
 - lookup de définition O(1) ou O(log n) ;
 - exécution proportionnelle à la taille du programme et de l’entrée ;
-- pas de travail dépendant du nombre total de pays à chaque validation.
+- pas de travail dépendant du nombre total de pays à chaque validation ;
+- **test d'appartenance non linéaire dans la taille de la liste.**
+
+Ce dernier point est neuf, parce que les listes le sont. Jusqu'à `2026.08.31` la
+plus longue tenait en quarante et une entrées et un balayage ne se voyait pas ;
+l'appartenance au registre en apporte 2 566 pour l'Allemagne et 148 pour la
+France, et deux moteurs l'ont mesuré depuis des bouts opposés. Un EUID allemand
+dont le tribunal n'existe pas coûte **310 ns** par recherche dichotomique et
+**10,86 µs** par balayage — 7,84 fois la validation d'un identifiant intact.
+
+Rien n'est à trier pour l'obtenir : `ir.md` dit que les valeurs de `prefix_in`
+sont **triées et dédupliquées par le compilateur**, et cette garantie existe
+précisément pour qu'un moteur puisse chercher dedans sans les réordonner. La
+séparation par longueur qu'impose l'Allemagne y aide encore : à longueur fixée,
+la recherche porte sur des clés de taille constante.
+
+Le coût tombe sur l'entrée refusée, pas sur l'entrée valide, donc il ne se voit
+pas dans un banc qui ne mesure que des identifiants corrects. C'est la raison
+pour laquelle la section 14 demande de mesurer aussi l'entrée invalide précoce.
 
 Les benchmarks doivent mesurer : chargement cold, validation simple, checksum
 complexe, entrée invalide précoce et exécution parallèle.
