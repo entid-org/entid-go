@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/libbusinessid/businessid-go/internal/gen"
@@ -183,4 +184,88 @@ func TestVersionChecksPrecedeUnknownFields(t *testing.T) {
 			t.Fatalf("got %v, want invalid_ruleset", err)
 		}
 	})
+}
+
+// answeringRule names, for every hostile fixture, the rule this loader refuses
+// it with. Every load failure answers invalid_ruleset or incompatible_ruleset,
+// so the corpus cannot see which of the twenty five checks spoke: a loader
+// enforcing a rule in the wrong place passes every case while disagreeing with
+// every other engine about what is wrong with a bundle. Another engine found
+// exactly that in itself, under a check number no case could observe.
+//
+// The fragments are short on purpose. They identify the rule, not its wording,
+// so rephrasing a diagnostic does not churn this table while a fixture that
+// starts being answered by a different rule does fail.
+var answeringRule = map[string]string{
+	"loader-alphabet-empty-031":              "the custom alphabet is empty",
+	"loader-alphabet-missing-033":            "reads a custom alphabet but carries none",
+	"loader-alphabet-repeated-030":           "the custom alphabet repeats",
+	"loader-alphabet-too-many-032":           "code points, the limit is 256",
+	"loader-alphabet-unread-034":             "under a mapping that does not read one",
+	"loader-call-cycle-014":                  "the call graph contains a cycle",
+	"loader-duplicate-prefix-017":            "designate both",
+	"loader-empty-002":                       "format version 0 is not supported",
+	"loader-empty-message-key-027":           "a declared message key must not be empty",
+	"loader-empty-rules-version-008":         "rules_version is empty",
+	"loader-forbidden-reason-code-018":       "cannot prove an invalidity",
+	"loader-global-target-with-prefix-023":   "declares a prefix on its GLOBAL target",
+	"loader-left-pad-length-026":             "left_pad length 4097 is outside",
+	"loader-missing-operation-009":           "node carries 0 operations",
+	"loader-modulus-out-of-range-021":        "modulus 1 is outside",
+	"loader-node-forward-reference-010":      "which is not strictly lower",
+	"loader-node-out-of-range-011":           "has root node 99 outside",
+	"loader-orphan-definition-016":           "is referenced by no dispatch target",
+	"loader-predicate-constant-028":          "constant 1000000001 is outside",
+	"loader-prefix-in-mixed-lengths-040":     "prefix_in mixes element lengths",
+	"loader-prefix-in-unsorted-039":          "prefix_in values are not strictly ascending",
+	"loader-program-expansion-036":           "expands to more than 100000 operation instances",
+	"loader-rules-version-shape-029":         "which is outside the allowed set",
+	"loader-short-digest-007":                "source_digest holds 16 bytes",
+	"loader-source-tier-unknown-035":         "states the tier 47",
+	"loader-stray-parameter-019":             "which does not declare it",
+	"loader-stray-when-branch-022":           "has a WHEN branch as its root",
+	"loader-subject-node-circular-037":       "which reads the subject it defines",
+	"loader-truncated-001":                   "exceeds the 190 remaining bytes",
+	"loader-type-mismatch-012":               "declares output type string but",
+	"loader-unbounded-digits-to-integer-020": "got no provable bound",
+	"loader-undeclared-feature-006":          "capability 2 is used but not declared",
+	"loader-unknown-call-target-015":         "calls the unknown program 42",
+	"loader-unknown-feature-005":             "capability 9999 is unknown",
+	"loader-unknown-field-root-003":          "unknown field 1007 in RuleBundle",
+	"loader-unspecified-enum-013":            "has an unspecified or unknown kind",
+	"loader-unsupported-format-version-004":  "format version 2 is not supported",
+	"loader-when-unreferenced-038":           "is a WHEN branch that nothing references",
+}
+
+// TestEachFixtureStopsAtTheRuleItNames drives the same corpus as
+// TestLoadRulesetCases and asserts the one thing the corpus cannot: which rule
+// answered. A fixture the corpus added and this table does not know fails too,
+// so a new case cannot slip in unexamined.
+func TestEachFixtureStopsAtTheRuleItNames(t *testing.T) {
+	fixtures := loadFixtures(t)
+	if len(fixtures) == 0 {
+		t.Fatal("the corpus carries no load_ruleset fixture")
+	}
+	seen := map[string]bool{}
+	for _, f := range fixtures {
+		t.Run(f.ID, func(t *testing.T) {
+			want, known := answeringRule[f.ID]
+			if !known {
+				t.Fatalf("the corpus carries %s and nothing here says which rule answers it", f.ID)
+			}
+			seen[f.ID] = true
+			_, err := gen.Load(f.Payload)
+			if err == nil {
+				t.Fatalf("the bundle loaded, so no rule answered")
+			}
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("answered by another rule:\n got %v\nwant a refusal mentioning %q", err, want)
+			}
+		})
+	}
+	for id := range answeringRule {
+		if !seen[id] {
+			t.Errorf("%s is pinned here but the corpus no longer carries it", id)
+		}
+	}
 }
