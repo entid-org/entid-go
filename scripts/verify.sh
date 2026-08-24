@@ -93,6 +93,19 @@ rules_version="$(lock_value rules_version)"
 source_commit="$(lock_value source_commit)"
 [ -n "$source_commit" ] || fail "lock digests" "rules.lock declares no source_commit"
 
+# 1b. The mirror says where it came from, and must say the same thing as the
+# lock. A release pull request that updates one and not the other leaves the
+# repository stating two different origins for one set of files, and a digest
+# check cannot see it because PROVENANCE.md is prose.
+grep -q -- "$source_commit" spec/PROVENANCE.md ||
+	fail "provenance" \
+		"rules.lock records source_commit $source_commit, which spec/PROVENANCE.md does not name" \
+		"$(sed -n '3,5p' spec/PROVENANCE.md)"
+grep -q -- "$rules_version" spec/PROVENANCE.md ||
+	fail "provenance" \
+		"rules.lock records rules_version $rules_version, which spec/PROVENANCE.md does not name" \
+		"$(sed -n '3,5p' spec/PROVENANCE.md)"
+
 # 2. The generated rules match the bundle they are generated from.
 run "regeneration" go generate ./...
 run "regeneration" git diff --exit-code -- rules_gen.go

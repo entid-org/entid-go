@@ -1,28 +1,7 @@
-# Pre-release lock, produced locally from the spec repository.
-#
-# `attestation_identity` is deliberately absent: no release has been tagged
-# yet, so there is no attested workflow identity to record. Once the first
-# release exists, the downstream pull request replaces this file with an
-# attested one, and the generator resolves the bundle from that release
-# instead of the local copy under spec/.
-rules_version = "2026.08.32"
+rules_version = "2026.08.33"
 format_version = 1
-rules_sha256 = "f442af5aedc8b4b82aae701983c49b88649fd825433e5b74e2c72e686356170d"
-conformance_sha256 = "43b6299e1afd69da913a06285db1aa9e7fda2c98c94ea2887e58253999b122a3"
-# The JSONL is shipped decompressed, so its digest is taken on what lands in
-# spec/ rather than on the archive. It went unlisted for a while: an engine
-# could not verify it, verify-lock.sh would not have noticed a drift, and
-# engine tests cite its case ids as provenance. Found by the Swift engine.
-#
-# Decompressed is also the only stable choice. The archive embeds a timestamp
-# taken from SOURCE_DATE_EPOCH, so its digest moves with the source commit while
-# its content does not: reproducible at a fixed commit, different across two.
-#
-# And expect this field to stay put while conformance_sha256 moves. That looks
-# exactly like the drift it was added to catch, and is not: the JSONL is the
-# reviewed source and carries no rules version, while the compiled corpus injects
-# one into every expected report. A version bump alone moves one and not the
-# other. Both measured by the Swift engine, on the release archive.
+rules_sha256 = "893588a58d410641078d01a61714d6106da65192ca33629bb4d462550ff2e3bc"
+conformance_sha256 = "17f1ced68e15c5c11df79ffe85338f9980b16c858124235111644db6b12123d9"
 conformance_jsonl_sha256 = "448b293eb13b01962c9acc021fce63209aa988a103fc5688a2c8b900e0084ff5"
 rules_proto_sha256 = "40c4472007251677dfc3df287188dba177cab6ab62b6d9546e05e89291a77465"
 conformance_proto_sha256 = "600b40465a71450ca452b26beae99dafcef43cda8b4e7dbe7e32d7b70e5c2a6e"
@@ -30,4 +9,5 @@ testee_proto_sha256 = "7209846f3dc2f2f43da537f9ef74f1beee6a02be612ab53594220e997
 ir_doc_sha256 = "9d104c7122cde69819bdd83f7a0c07acd0be6e7c9fc7f142e46626194ddc176e"
 features_doc_sha256 = "1cb41bff278f1606f0215ccac387c92abf7ec2bdcc7683be93b52c9291f3689a"
 stability = "alpha"
-source_commit = "4bf7699eadbe962ef0b439e95a4433b7b572a027"
+source_commit = "b264614ff7f1d95a945128578e54e18225a90f0a"
+attestation_identity = "libbusinessid/spec/.github/workflows/release.yml@refs/tags/v0.1.1"
