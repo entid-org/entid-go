@@ -5,6 +5,7 @@ package gen_test
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -907,5 +908,448 @@ func TestDeadWhenBranchIsRefused(t *testing.T) {
 	// the WHEN and on nothing else.
 	if _, err := gen.Load(allOpcodesBundle().encode()); err != nil {
 		t.Fatalf("the unmutated bundle must load: %v", err)
+	}
+}
+
+// TestStructuralRefusals covers the refusal branches of section 10 that the
+// corpus does not reach. The corpus carries thirty six hostile bundles and each
+// proves one rule; the rules below have no fixture, so without these cases the
+// code that enforces them never ran outside its own compilation.
+//
+// Each case damages the bundle that holds every operation, in one place, and
+// names the diagnostic it expects. A case that started failing on an earlier
+// check would say so rather than pass.
+func TestStructuralRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		mutate   func(*bundle)
+		contains string
+	}{
+		{
+			name:     "a program numbered zero",
+			mutate:   func(b *bundle) { b.programs[0].id = 0 },
+			contains: "has id 0",
+		},
+		{
+			name:     "a program with no node",
+			mutate:   func(b *bundle) { b.programs[2].nodes = nil },
+			contains: "holds no node",
+		},
+		{
+			name: "more nodes than a program may hold",
+			mutate: func(b *bundle) {
+				p := &b.programs[2]
+				filler := p.nodes[0]
+				for len(p.nodes) <= gen.MaxNodesPerProgram {
+					p.nodes = append(p.nodes, filler)
+				}
+			},
+			// The decoder bounds this before the loader can, so the message is
+			// the decoder's. The loader keeps its own check as a second line.
+			contains: "more than 4096 nodes in a program",
+		},
+		{
+			name:   "an operation outside the enumeration",
+			mutate: func(b *bundle) { b.programs[1].nodes[1].kind = 9999 },
+			// Again the decoder answers first, naming the message it was reading.
+			contains: "StringOperation kind 9999 is unknown",
+		},
+		{
+			name: "a canonicalization program declaring a subject",
+			mutate: func(b *bundle) {
+				b.programs[0].hasSubject, b.programs[0].subject = true, 0
+			},
+			contains: "declares a subject",
+		},
+		{
+			name: "a subject node outside the program",
+			mutate: func(b *bundle) {
+				b.programs[1].hasSubject, b.programs[1].subject = true, 900
+			},
+			contains: "subject node 900 outside",
+		},
+		{
+			name: "a subject node that is not a string",
+			mutate: func(b *bundle) {
+				// Node 30 is a predicate that reads nothing, so it fails on its
+				// type and not on reading the subject it would define.
+				b.programs[1].hasSubject, b.programs[1].subject = true, 30
+			},
+			contains: "does not produce a string",
+		},
+		{
+			name: "captures on a program that is not a format program",
+			mutate: func(b *bundle) {
+				b.programs[3].captures = []capture{{name: "a", node: 0}}
+			},
+			contains: "not a format program but declares captures",
+		},
+		{
+			name: "more captures than a format program may declare",
+			mutate: func(b *bundle) {
+				p := &b.programs[1]
+				for i := 0; i <= gen.MaxCapturesPerFormat; i++ {
+					p.captures = append(p.captures, capture{name: fmt.Sprintf("c%d", i), node: 0})
+				}
+			},
+			contains: "the limit is 128",
+		},
+		{
+			name: "an unnamed capture",
+			mutate: func(b *bundle) {
+				b.programs[1].captures = []capture{{name: "", node: 0}}
+			},
+			contains: "unnamed capture",
+		},
+		{
+			name: "two captures under one name",
+			mutate: func(b *bundle) {
+				b.programs[1].captures = []capture{{name: "a", node: 0}, {name: "a", node: 0}}
+			},
+			contains: "twice",
+		},
+		{
+			name: "a capture naming a node outside the program",
+			mutate: func(b *bundle) {
+				b.programs[1].captures = []capture{{name: "a", node: 900}}
+			},
+			contains: "outside",
+		},
+		{
+			name: "a capture naming a node that is not a string",
+			mutate: func(b *bundle) {
+				b.programs[1].captures = []capture{{name: "a", node: 30}}
+			},
+			contains: "does not name a string node",
+		},
+		{
+			name: "too few repeated operands",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[31] = pr(pAny, nil)
+			},
+			contains: "needs at least",
+		},
+		{
+			name: "a repeated operand of the wrong type",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[31] = pr(pAny, []uint32{0})
+			},
+			contains: "as repeated operand",
+		},
+		{
+			name: "a constant above the byte limit",
+			mutate: func(b *bundle) {
+				b.programs[0].nodes[5] = cn(cPrepend, nil, text(strings.Repeat("x", gen.MaxConstantBytes+1)))
+			},
+			contains: "exceeds the 4096 byte limit",
+		},
+		{
+			name: "a replacement above the byte limit",
+			mutate: func(b *bundle) {
+				b.programs[0].nodes[4] = cn(cReplacePrefix, nil,
+					text("XX"), replacement(strings.Repeat("y", gen.MaxConstantBytes+1)))
+			},
+			contains: "replacement of",
+		},
+		{
+			name: "more weights than the limit",
+			mutate: func(b *bundle) {
+				w := make([]int64, gen.MaxWeights+1)
+				for i := range w {
+					w[i] = 1
+				}
+				b.programs[3].nodes[5] = in64(iWeighted, []uint32{1},
+					weights(w...), alignment(alignLeft), mapping(mapDigit))
+			},
+			// The decoder bounds the count while reading the field.
+			contains: "more than 256 weights",
+		},
+		{
+			name: "a weight beyond the magnitude limit",
+			mutate: func(b *bundle) {
+				b.programs[3].nodes[5] = in64(iWeighted, []uint32{1},
+					weights(gen.MaxWeightMagnitude+1), alignment(alignLeft), mapping(mapDigit))
+			},
+			contains: "magnitude limit",
+		},
+		{
+			name: "a slice whose start is above its end",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[4] = sn(sSlice, []uint32{0}, start(9), end(2))
+			},
+			contains: "above end",
+		},
+		{
+			name: "a length range that is empty",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[20] = pr(pLenBetween, []uint32{0}, minLen(9), maxLen(2))
+			},
+			contains: "above max_length",
+		},
+		{
+			name: "lengths that do not ascend",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[19] = pr(pLenIn, []uint32{0}, lengths(12, 3))
+			},
+			contains: "strictly ascending",
+		},
+		{
+			name: "an empty value among a prefix set",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[27] = pr(pPrefixIn, []uint32{0}, values("AA", ""))
+			},
+			contains: "empty",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := allOpcodesBundle()
+			tc.mutate(&b)
+			_, err := gen.Load(b.encode())
+			if !errors.Is(err, gen.ErrInvalidRuleset) {
+				t.Fatalf("got %v, want invalid_ruleset", err)
+			}
+			if !strings.Contains(err.Error(), tc.contains) {
+				t.Fatalf("refused on another rule: %q does not mention %q", err, tc.contains)
+			}
+		})
+	}
+}
+
+// TestEnumNames sweeps the enumerations the generator prints. Every name here
+// reaches a diagnostic a maintainer reads, or the emitted source itself, and a
+// wrong or empty one is only visible when the branch that produces it runs. The
+// sweep is over the numeric range rather than over a list, so a value added to
+// the IR without a name fails here.
+func TestEnumNames(t *testing.T) {
+	t.Run("value types", func(t *testing.T) {
+		seen := map[string]gen.ValueType{}
+		for v := gen.ValueString; v <= gen.ValueChecksumOutcome; v++ {
+			name := v.String()
+			if name == "" || name == "unspecified" {
+				t.Errorf("value type %d has no name", v)
+				continue
+			}
+			if other, dup := seen[name]; dup {
+				t.Errorf("value types %d and %d share the name %q", other, v, name)
+			}
+			seen[name] = v
+		}
+		if got := gen.ValueUnspecified.String(); got != "unspecified" {
+			t.Errorf("the zero value type is %q", got)
+		}
+		if got := gen.ValueType(99).String(); got != "unspecified" {
+			t.Errorf("a value type outside the enumeration is %q", got)
+		}
+	})
+
+	t.Run("program kinds", func(t *testing.T) {
+		seen := map[string]bool{}
+		for k := gen.ProgramCanonicalization; k <= gen.ProgramChecksum; k++ {
+			name := k.String()
+			if name == "" || name == "unspecified" {
+				t.Errorf("program kind %d has no name", k)
+			}
+			if seen[name] {
+				t.Errorf("program kind %d repeats the name %q", k, name)
+			}
+			seen[name] = true
+		}
+		if got := gen.ProgramUnspecified.String(); got != "unspecified" {
+			t.Errorf("the zero program kind is %q", got)
+		}
+		if got := gen.ProgramKind(99).String(); got != "unspecified" {
+			t.Errorf("a program kind outside the enumeration is %q", got)
+		}
+	})
+
+	t.Run("reason codes", func(t *testing.T) {
+		// The sweep runs past the end of the enumeration on purpose: what is
+		// asserted is that every value answers, named or not.
+		named, goNames := map[string]bool{}, map[string]bool{}
+		for c := gen.ReasonCode(0); c < 64; c++ {
+			name, goName := c.String(), c.GoName()
+			if name == "" {
+				t.Fatalf("reason %d prints nothing", c)
+			}
+			if goName == "" {
+				t.Fatalf("reason %d has no Go name", c)
+			}
+			if name == "unspecified" {
+				continue
+			}
+			if !strings.HasPrefix(goName, "Reason") {
+				t.Errorf("reason %d has the Go name %q, which names no constant", c, goName)
+			}
+			if named[name] {
+				t.Errorf("reason %d repeats the name %q", c, name)
+			}
+			if goNames[goName] {
+				t.Errorf("reason %d repeats the Go name %q", c, goName)
+			}
+			named[name], goNames[goName] = true, true
+		}
+		if len(named) < 20 {
+			t.Fatalf("only %d reason codes are named; the sweep found almost nothing", len(named))
+		}
+		t.Logf("%d named reason codes", len(named))
+		if got := gen.ReasonCode(-1).String(); got != "unspecified" {
+			t.Errorf("a negative reason code is %q", got)
+		}
+	})
+}
+
+// TestDispatcherAndDefinitionRefusals covers checks 17 to 24, which decide how a
+// value is routed. The corpus reaches a handful of them; the rest guard the
+// table that turns a kind and a country into a definition, and a bundle that
+// got past them with a broken table would route a value to the wrong rules.
+func TestDispatcherAndDefinitionRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		mutate   func(*bundle)
+		contains string
+	}{
+		{
+			name:     "a definition numbered zero",
+			mutate:   func(b *bundle) { b.defs[0].id = 0 },
+			contains: "id 0",
+		},
+		{
+			name:     "a canonicalizer that is not a canonicalization program",
+			mutate:   func(b *bundle) { b.defs[0].canon = 2 },
+			contains: "canonicalization program",
+		},
+		{
+			name:     "a format program that is not a format program",
+			mutate:   func(b *bundle) { b.defs[0].format = 1 },
+			contains: "format program",
+		},
+		{
+			name:     "a checksum program that is not a checksum program",
+			mutate:   func(b *bundle) { b.defs[0].checksum = 2 },
+			contains: "checksum program",
+		},
+		{
+			name:     "an absence reason that is not one",
+			mutate:   func(b *bundle) { b.defs[2].absentReason = rcInvalidFormat },
+			contains: "absence",
+		},
+		{
+			name:     "a dispatcher kind that is not a token",
+			mutate:   func(b *bundle) { b.defs[0].kind, b.defs[1].kind, b.dispatchers[0].kind = "T T", "T T", "T T" },
+			contains: "kind",
+		},
+		{
+			name:     "a kind alias that is not a token",
+			mutate:   func(b *bundle) { b.dispatchers[0].aliases = []string{"bad alias"} },
+			contains: "alias",
+		},
+		{
+			name:     "kind aliases out of order",
+			mutate:   func(b *bundle) { b.dispatchers[0].aliases = []string{"tb", "ta"} },
+			contains: "does not sort its kind aliases",
+		},
+		{
+			name:     "a pre-canonicalizer that is not a canonicalization program",
+			mutate:   func(b *bundle) { b.dispatchers[0].pre = 2 },
+			contains: "canonicalization program",
+		},
+		{
+			name:     "a target naming a definition that does not exist",
+			mutate:   func(b *bundle) { b.dispatchers[1].targets[0].definition = 99 },
+			contains: "99",
+		},
+		{
+			name:     "a dispatcher with no target",
+			mutate:   func(b *bundle) { b.dispatchers[1].targets = nil },
+			contains: "no target",
+		},
+		{
+			name: "a GLOBAL target beside a country target",
+			mutate: func(b *bundle) {
+				// A GLOBAL target sorts before every country one, so it is
+				// prepended: ordering is checked first and would answer
+				// instead.
+				b.dispatchers[0].targets = append([]target{{definition: 1}}, b.dispatchers[0].targets...)
+			},
+			contains: "GLOBAL",
+		},
+		{
+			name: "a target country that is not a token",
+			mutate: func(b *bundle) {
+				b.dispatchers[0].targets[0].country = "F"
+			},
+			contains: "country",
+		},
+		{
+			name:     "accepted prefixes out of order",
+			mutate:   func(b *bundle) { b.dispatchers[0].targets[0].prefixes = []string{"PP", "P"} },
+			contains: "does not sort the prefixes",
+		},
+		{
+			name:     "a canonical prefix that is not a token",
+			mutate:   func(b *bundle) { b.dispatchers[0].targets[0].canonicalPrefix = "p-" },
+			contains: "prefix",
+		},
+		{
+			name: "a canonicalization program not rooted in a sequence",
+			mutate: func(b *bundle) {
+				b.programs[0].root = 0
+			},
+			contains: "root",
+		},
+		{
+			name: "a format program not rooted in a sequence of assertions",
+			mutate: func(b *bundle) {
+				b.programs[1].root = 0
+			},
+			contains: "root",
+		},
+		{
+			name: "a checksum program not rooted in a checksum outcome",
+			mutate: func(b *bundle) {
+				b.programs[3].root = 0
+			},
+			contains: "root",
+		},
+		{
+			name: "a left_pad padded with more than one code point",
+			mutate: func(b *bundle) {
+				b.programs[0].nodes[8] = cn(cLeftPad, nil, length(12), text("00"))
+			},
+			contains: "one padding code point",
+		},
+		{
+			name: "a replace_prefix mapping a prefix to itself",
+			mutate: func(b *bundle) {
+				b.programs[0].nodes[4] = cn(cReplacePrefix, nil, text("XX"), replacement("XX"))
+			},
+			contains: "prefix to itself",
+		},
+		{
+			name: "an empty constant where a token is required",
+			mutate: func(b *bundle) {
+				b.programs[0].nodes[3] = cn(cRemoveChars, nil, text(""))
+			},
+			contains: "empty",
+		},
+		{
+			name: "a profile predicate naming a profile that does not exist",
+			mutate: func(b *bundle) {
+				b.programs[1].nodes[30] = pr(pProfile, nil, text("lenient"))
+			},
+			contains: "profile",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := allOpcodesBundle()
+			tc.mutate(&b)
+			_, err := gen.Load(b.encode())
+			if !errors.Is(err, gen.ErrInvalidRuleset) {
+				t.Fatalf("got %v, want invalid_ruleset", err)
+			}
+			if !strings.Contains(err.Error(), tc.contains) {
+				t.Fatalf("refused on another rule: %q does not mention %q", err, tc.contains)
+			}
+		})
 	}
 }

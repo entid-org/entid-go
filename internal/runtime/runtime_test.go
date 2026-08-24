@@ -422,3 +422,106 @@ func TestWeightedSumAlphabetMatchesFixedMappings(t *testing.T) {
 		}
 	}
 }
+
+// TestViewPrimitivesTheShippedRulesDoNotReach covers the primitives no current
+// rule uses. The emitted code calls into this package, so a primitive the
+// bundle happens not to exercise today is untested code that a rule change
+// would put on the hot path tomorrow. Absence is checked on each of them:
+// section 1.1 of ir.md makes absence a value, never an error.
+func TestViewPrimitivesTheShippedRulesDoNotReach(t *testing.T) {
+	t.Run("rune length counts code points, not bytes", func(t *testing.T) {
+		for _, tc := range []struct {
+			in   rt.View
+			want int
+		}{
+			{rt.Value("ABC"), 3},
+			{rt.Value(""), 0},
+			// Four code points, eight bytes.
+			{rt.Value("éèêë"), 4},
+			{rt.Absent, 0},
+		} {
+			if got := tc.in.RuneLen(); got != tc.want {
+				t.Errorf("RuneLen(%q) = %d, want %d", tc.in.String(), got, tc.want)
+			}
+		}
+	})
+
+	t.Run("length_in", func(t *testing.T) {
+		for _, tc := range []struct {
+			in      rt.View
+			lengths []int
+			want    bool
+		}{
+			{rt.Value("ABC"), []int{1, 3, 5}, true},
+			{rt.Value("ABC"), []int{1, 5}, false},
+			{rt.Value("ABC"), nil, false},
+			{rt.Value("éèê"), []int{3}, true},
+			{rt.Absent, []int{0, 3}, false},
+		} {
+			if got := tc.in.LengthIn(tc.lengths...); got != tc.want {
+				t.Errorf("LengthIn(%q, %v) = %v", tc.in.String(), tc.lengths, got)
+			}
+		}
+	})
+
+	t.Run("prefix_in", func(t *testing.T) {
+		for _, tc := range []struct {
+			in       rt.View
+			prefixes []string
+			want     bool
+		}{
+			{rt.Value("FR123"), []string{"BE", "FR"}, true},
+			{rt.Value("FR123"), []string{"BE", "DE"}, false},
+			{rt.Value("FR123"), nil, false},
+			{rt.Value("FR123"), []string{""}, true},
+			{rt.Absent, []string{"FR"}, false},
+		} {
+			if got := tc.in.PrefixIn(tc.prefixes...); got != tc.want {
+				t.Errorf("PrefixIn(%q, %v) = %v", tc.in.String(), tc.prefixes, got)
+			}
+		}
+	})
+
+	t.Run("concat", func(t *testing.T) {
+		if got := rt.Concat(rt.Value("AB"), rt.Value(""), rt.Value("CD")); got.String() != "ABCD" {
+			t.Errorf("Concat = %q", got.String())
+		}
+		if got := rt.Concat(); !got.IsEmpty() {
+			t.Errorf("Concat of nothing = %q, want the empty value", got.String())
+		}
+		// One absent part makes the whole absent: a concatenation with a hole
+		// has no value, and inventing one would fabricate an identifier.
+		if got := rt.Concat(rt.Value("AB"), rt.Absent, rt.Value("CD")); !got.IsAbsent() {
+			t.Errorf("Concat with an absent part = %q, want absent", got.String())
+		}
+	})
+
+	t.Run("char_at_in on an index outside the value", func(t *testing.T) {
+		if rt.Value("ABC").CharAtIn(9, "A") {
+			t.Error("an index past the end matches nothing")
+		}
+		if rt.Value("ABC").CharAtIn(-1, "A") {
+			t.Error("a negative index matches nothing")
+		}
+		if rt.Absent.CharAtIn(0, "A") {
+			t.Error("absence matches nothing")
+		}
+	})
+
+	t.Run("absence propagates through every view constructor", func(t *testing.T) {
+		for name, got := range map[string]rt.View{
+			"slice":         rt.Absent.Slice(0, 1),
+			"slice_from":    rt.Absent.SliceFrom(1),
+			"slice_to":      rt.Absent.SliceTo(1),
+			"before_first":  rt.Absent.BeforeFirst("."),
+			"after_first":   rt.Absent.AfterFirst("."),
+			"strip_prefix":  rt.Absent.StripPrefix("A"),
+			"concat":        rt.Concat(rt.Absent),
+			"slice_from_ok": rt.Value("AB").SliceFrom(9),
+		} {
+			if !got.IsAbsent() {
+				t.Errorf("%s produced %q, want absent", name, got.String())
+			}
+		}
+	})
+}
