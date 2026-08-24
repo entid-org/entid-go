@@ -510,3 +510,63 @@ func TestPreCanonicalizationPrecedesTheCountryDecision(t *testing.T) {
 		})
 	}
 }
+
+// TestInputLengthIsCountedInBytesHeld pins the choice step 1 of section 6 of
+// ir.md requires an engine to make and to state. The bound is expressed in
+// UTF-8 bytes and is measured before the step that refuses ill formed text, so
+// a language whose strings admit such text has to decide what to count.
+//
+// A Go string is an arbitrary byte sequence rather than code units awaiting an
+// encoder, so this engine counts the bytes the string already holds. Nothing is
+// encoded and nothing is invented. What that decides is the order between the
+// two refusals, which is what this test measures.
+func TestInputLengthIsCountedInBytesHeld(t *testing.T) {
+	engine := businessid.New()
+	const bound = 1024
+
+	// One invalid byte, padded to sit either side of the bound. The byte is
+	// counted exactly like any other, so the length alone decides.
+	for _, tc := range []struct {
+		name   string
+		value  string
+		reason businessid.Reason
+	}{
+		{"ill formed, one byte above the bound", strings.Repeat("0", bound) + "\xff", businessid.ReasonInputTooLong},
+		{"ill formed, exactly at the bound", strings.Repeat("0", bound-1) + "\xff", businessid.ReasonInvalidEncoding},
+		{"well formed, one byte above the bound", strings.Repeat("0", bound+1), businessid.ReasonInputTooLong},
+		// Past the bound, an ordinary rule answers: 1024 digits is not a SIREN.
+		{"well formed, exactly at the bound", strings.Repeat("0", bound), businessid.ReasonInvalidLength},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := engine.Validate(businessid.Input{Kind: "siren", Value: tc.value})
+			if err != nil {
+				t.Fatalf("neither case is an engine error: %v", err)
+			}
+			if report.Format.Reason != tc.reason {
+				t.Fatalf("got %s, want %s", report.Format.Reason, tc.reason)
+			}
+			if report.CanonicalValue != tc.value {
+				t.Error("the value must be reported verbatim")
+			}
+		})
+	}
+
+	// A multi byte code point is counted in bytes, not in code points: three
+	// hundred and forty five U+00E9 are 690 bytes and pass the bound, while
+	// five hundred and thirteen are 1026 bytes and do not.
+	for _, tc := range []struct {
+		count  int
+		reason businessid.Reason
+	}{{345, businessid.ReasonInvalidLength}, {513, businessid.ReasonInputTooLong}} {
+		report, err := engine.Validate(businessid.Input{
+			Kind: "siren", Value: strings.Repeat("é", tc.count),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if report.Format.Reason != tc.reason {
+			t.Errorf("%d code points, %d bytes: got %s, want %s",
+				tc.count, tc.count*2, report.Format.Reason, tc.reason)
+		}
+	}
+}

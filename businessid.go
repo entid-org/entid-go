@@ -118,9 +118,23 @@ type Input struct {
 	// aliases the rules declare. It is required.
 	Kind string
 
-	// Value is the identifier as it was received, in valid UTF-8. It is passed
-	// through unchanged in the result. A value above 1024 UTF-8 bytes is
-	// reported Unsupported with ReasonInputTooLong rather than truncated.
+	// Value is the identifier as it was received. It is passed through
+	// unchanged in the result. A value above 1024 UTF-8 bytes is reported
+	// Unsupported with ReasonInputTooLong rather than truncated.
+	//
+	// Step 1 of section 6 of ir.md bounds the input in UTF-8 bytes and runs
+	// before the step that refuses ill formed text, so an engine whose string
+	// type admits such text must choose how to count it and say which choice
+	// it made. This one counts the bytes the string already holds. A Go string
+	// is an arbitrary byte sequence, not a sequence of code units awaiting an
+	// encoder, so there is nothing to encode and nothing to invent: len(Value)
+	// is the count, exactly, whether or not the bytes form valid UTF-8.
+	//
+	// The observable consequence is the order. A value both ill formed and
+	// above the bound is ReasonInputTooLong, not ReasonInvalidEncoding, since
+	// the bound is measured first. Below the bound, ill formed text is
+	// ReasonInvalidEncoding. Both are Unsupported, and no conformance case can
+	// carry either, because a proto3 string is valid UTF-8 by definition.
 	Value string
 
 	// CountryCode is an optional ISO 3166-1 alpha-2 hint. It disambiguates a

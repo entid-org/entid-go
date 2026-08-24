@@ -71,6 +71,53 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+      # Section 12.2 of engine.md: the threshold covers hand written code -
+      # the engine, its primitives, its API, its generator. rules_gen.go is
+      # emitted from the bundle and its coverage measures the corpus rather
+      # than this engine, so it is published and never gated. cmd/businessid-
+      # demo is excluded for a different reason: its whole body is a main that
+      # calls os.Exit, which no test binary can enter, so it is verified as a
+      # process by cmd/businessid-demo/main_test.go instead. Both exclusions
+      # are asserted by TestCoverageGateIsDeclared.
+      - name: Coverage of hand-written code
+        run: |
+          go test ./... -coverprofile=coverage.out -covermode=atomic -coverpkg=./... -timeout 600s
+          awk 'NR > 1 {
+                 if ($1 ~ /rules_gen\.go/) next
+                 if ($1 ~ /cmd\/businessid-demo/) next
+                 stmt[$1] = $2
+                 if ($3 > 0) hit[$1] = 1
+               }
+               END {
+                 for (block in stmt) {
+                   total += stmt[block]
+                   if (block in hit) covered += stmt[block]
+                 }
+                 if (total == 0) {
+                   print "the profile carries no hand-written block" > "/dev/stderr"
+                   exit 1
+                 }
+                 pct = 100 * covered / total
+                 printf "hand-written coverage: %d/%d statements, %.2f%%\n", covered, total, pct
+                 if (pct < 95.0) {
+                   printf "below the 95%% gate of engine.md section 12.2\n" > "/dev/stderr"
+                   exit 1
+                 }
+               }' coverage.out
+          awk 'NR > 1 && $1 ~ /rules_gen\.go/ {
+                 stmt[$1] = $2
+                 if ($3 > 0) hit[$1] = 1
+               }
+               END {
+                 for (block in stmt) {
+                   total += stmt[block]
+                   if (block in hit) covered += stmt[block]
+                 }
+                 if (total > 0) {
+                   printf "generated rules, published not gated: %d/%d statements, %.2f%%\n", covered, total, 100 * covered / total
+                 }
+               }' coverage.out
+
       - name: Fuzz smoke tests
         run: |
           go test ./internal/gen -run FuzzLoad -fuzz FuzzLoad -fuzztime 30s

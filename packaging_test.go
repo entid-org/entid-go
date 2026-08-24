@@ -341,3 +341,43 @@ func TestRulesLockDigestsMatchTheMirror(t *testing.T) {
 		}
 	}
 }
+
+// TestCoverageGateIsDeclared pins the threshold and what it covers. Section
+// 12.2 of engine.md separates hand written code, which the thresholds gate,
+// from code emitted from the bundle, whose coverage measures the corpus and
+// must be published rather than gated: a flawless engine would fail on a gap in
+// the corpus, and the only way back to green would be to lower the threshold.
+//
+// The exclusions are asserted rather than trusted, because an exclusion added
+// quietly is how a gate stops meaning anything.
+func TestCoverageGateIsDeclared(t *testing.T) {
+	workflow, err := os.ReadFile(filepath.Join(".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ci := string(workflow)
+
+	if !strings.Contains(ci, "-coverprofile=coverage.out") {
+		t.Error("the workflow measures no coverage")
+	}
+	if !strings.Contains(ci, "pct < 95.0") {
+		t.Error("the workflow declares no 95 per cent gate")
+	}
+	// Exactly two exclusions, each for a stated reason.
+	for _, excluded := range []string{`rules_gen\.go`, `cmd\/businessid-demo`} {
+		if !strings.Contains(ci, excluded) {
+			t.Errorf("the gate does not exclude %s", excluded)
+		}
+	}
+	// The generated file is measured and reported even though it is not gated.
+	if !strings.Contains(ci, "published not gated") {
+		t.Error("the coverage of the generated rules is not published")
+	}
+	// A threshold below the one the specification names would be a silent
+	// lowering, which is the thing this test exists to prevent.
+	for _, m := range regexp.MustCompile(`pct < (\d+(?:\.\d+)?)`).FindAllStringSubmatch(ci, -1) {
+		if m[1] != "95.0" {
+			t.Errorf("the gate is set at %s, and engine.md section 12.2 names 95", m[1])
+		}
+	}
+}

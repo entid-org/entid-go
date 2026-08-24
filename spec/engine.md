@@ -538,10 +538,18 @@ valide, le résultat est `unsupported_checksum` ou `checksum_not_published`.
 Le moteur possède des valeurs internes typées : chaîne, entier borné, booléen,
 chaîne absente et résultat checksum. Les conversions implicites sont interdites.
 
-Une vue hors limites produit une valeur absente, jamais une exception. Les règles de
-format sont censées établir les limites avant les opérations checksum ; un accès
-hors limites dans un checksum après format valide indique un bundle invalide et doit
-produire une erreur moteur.
+Une vue hors limites produit une valeur absente, jamais une exception. `ir.md`
+section 1.1 le dit sans réserve : « Absence is never an error and never an
+exception. »
+
+Ce paragraphe ajoutait ensuite qu'un accès hors limites dans un checksum après un
+format valide devait produire une erreur moteur. Il se contredisait donc en deux
+phrases, et l'écart était observable sur une entrée réelle : deux moteurs pouvaient
+répondre l'un une absence, l'autre une erreur. Le moteur Kotlin l'a relevé et a suivi
+`ir.md`, ce qui est la bonne lecture. L'intuition derrière la phrase supprimée reste
+juste — une règle de format est censée établir les bornes avant le checksum — mais
+c'est une propriété du jeu de règles, pas un comportement d'exécution, et rien ne
+permet de la prouver au chargement.
 
 ### 9.2 Entiers
 
@@ -681,12 +689,16 @@ Aucune release n'est nécessaire, rien n'est à télécharger à la main, et le 
 prérequis est une toolchain Go dans la CI : c'est un outil de construction, il
 n'entre ni dans le paquet publié ni dans ses dépendances.
 
-Le module `spec` demande une version de Go plus récente que celle qu'un moteur
-épingle probablement pour lui-même, et `actions/setup-go` pose `GOTOOLCHAIN: local`,
-ce qui interdit d'en récupérer une. L'étape du runner doit donc poser
-`GOTOOLCHAIN: auto` — le testee, lui, reste construit avec la toolchain épinglée du
-moteur. Mesuré : sans cela, la première exécution échoue sur la résolution de la
-toolchain, pas sur un écart de conformité.
+`actions/setup-go` pose `GOTOOLCHAIN: local`, ce qui interdit de récupérer une
+toolchain. L'étape du runner doit donc poser `GOTOOLCHAIN: auto` ; le testee, lui,
+reste construit avec la toolchain épinglée du moteur.
+
+La condition exacte est la ligne `go` du module `spec`, pas sa ligne `toolchain` :
+c'est la première qui lie. Un moteur épinglant un Go antérieur échoue sur la
+résolution de la toolchain, pas sur un écart de conformité — c'est arrivé au moteur
+Go, épinglé plus bas. Un moteur qui résout `stable` ne rencontre jamais le cas, et le
+moteur TypeScript l'a mesuré ainsi. Posez `GOTOOLCHAIN: auto` quand même : c'est une
+assurance qui ne coûte rien, et la ligne `go` de `spec` montera un jour.
 
 Un moteur NE DOIT PAS écrire son propre runner. C'est la seule chose qui fasse que
 « conforme » veuille dire quelque chose : un comparateur écrit par le moteur qu'il

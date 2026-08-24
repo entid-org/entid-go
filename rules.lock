@@ -5,19 +5,29 @@
 # release exists, the downstream pull request replaces this file with an
 # attested one, and the generator resolves the bundle from that release
 # instead of the local copy under spec/.
-rules_version = "2026.08.26"
+rules_version = "2026.08.31"
 format_version = 1
-rules_sha256 = "d6fa97d42f8ea86bb65a32b7f48080a5d6f0cd25714548840d04eb219dd77141"
-conformance_sha256 = "6b3121293df6037b1b23416c5349e509e4b79fb2a16547a2ba2c690483a43b18"
+rules_sha256 = "f7e264e1a67722eb54a34177cd9a785466904b1b4fb079022507564127dce750"
+conformance_sha256 = "9c47942ca9f44b80bd242c50cee7fc9d638eddcbb4eb8e76130de47b84bdb935"
 # The JSONL is shipped decompressed, so its digest is taken on what lands in
 # spec/ rather than on the archive. It went unlisted for a while: an engine
 # could not verify it, verify-lock.sh would not have noticed a drift, and
 # engine tests cite its case ids as provenance. Found by the Swift engine.
-conformance_jsonl_sha256 = "b0b54adfaf20e254f30beaef3243ba470a4d3608259e28486ca8d5f34627a090"
+#
+# Decompressed is also the only stable choice. The archive embeds a timestamp
+# taken from SOURCE_DATE_EPOCH, so its digest moves with the source commit while
+# its content does not: reproducible at a fixed commit, different across two.
+#
+# And expect this field to stay put while conformance_sha256 moves. That looks
+# exactly like the drift it was added to catch, and is not: the JSONL is the
+# reviewed source and carries no rules version, while the compiled corpus injects
+# one into every expected report. A version bump alone moves one and not the
+# other. Both measured by the Swift engine, on the release archive.
+conformance_jsonl_sha256 = "f81b8a8d972174cfcf28948d2ef7225a710bac471d8566eaece5535eea7944da"
 rules_proto_sha256 = "40c4472007251677dfc3df287188dba177cab6ab62b6d9546e05e89291a77465"
 conformance_proto_sha256 = "600b40465a71450ca452b26beae99dafcef43cda8b4e7dbe7e32d7b70e5c2a6e"
 testee_proto_sha256 = "7209846f3dc2f2f43da537f9ef74f1beee6a02be612ab53594220e997acf3dbc"
-ir_doc_sha256 = "08b816a78d226e878a6194368cb84f906a14bc8ddcac94b516f1bf0c18814199"
+ir_doc_sha256 = "14593d1e03e182d080557af5e596c60b5a7e96a27408917c9d610c6d01b6b302"
 features_doc_sha256 = "1cb41bff278f1606f0215ccac387c92abf7ec2bdcc7683be93b52c9291f3689a"
 stability = "alpha"
-source_commit = "53fb506a0429f7babb859a2deb3c67a1a398e94d"
+source_commit = "3f68173b64388e6e5071534f3d9198d29a524d20"

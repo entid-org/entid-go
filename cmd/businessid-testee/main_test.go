@@ -4,8 +4,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -490,5 +492,121 @@ func TestChecksumStepReportsItsKey(t *testing.T) {
 	checksum = fields(t, report[5])
 	if key, present := checksum[3]; present {
 		t.Fatalf("a checksum that was not requested carries the key %q", key)
+	}
+}
+
+// The paths below are the ones a conformance run never takes: a malformed
+// frame, a stream that stops mid message, a standard output that fails. The
+// runner always speaks the protocol correctly, so without these the code that
+// handles it speaking incorrectly never ran.
+
+// errWriter fails after letting a fixed number of bytes through, which is how a
+// closed pipe behaves to the process writing into it.
+type errWriter struct {
+	allow int
+	err   error
+}
+
+func (w *errWriter) Write(p []byte) (int, error) {
+	if w.allow <= 0 {
+		return 0, w.err
+	}
+	if len(p) > w.allow {
+		n := w.allow
+		w.allow = 0
+		return n, w.err
+	}
+	w.allow -= len(p)
+	return len(p), nil
+}
+
+func TestDecodeRequestRefusesMalformedFrames(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body []byte
+	}{
+		{"a tag varint that never ends", []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}},
+		{"a varint field whose value never ends", []byte{0x10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}},
+		{"a length that never ends", []byte{0x0a, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}},
+		{"a length beyond the frame", []byte{0x0a, 0x40, 'a'}},
+		{"a fixed width field, which no request carries", []byte{0x0d, 0x01, 0x02, 0x03, 0x04}},
+		{"a group, which proto3 removed", []byte{0x0b, 0x01}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := decodeRequest(tc.body); err == nil {
+				t.Fatal("a malformed request must be refused, not guessed at")
+			}
+		})
+	}
+
+	t.Run("a country code crosses the protocol", func(t *testing.T) {
+		body := appendString(nil, 6, "BE")
+		req, err := decodeRequest(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if req.countryCode != "BE" {
+			t.Fatalf("country %q", req.countryCode)
+		}
+	})
+}
+
+func TestReadVarintStopsAtTenBytes(t *testing.T) {
+	// Eleven continuation bytes cannot encode a 64 bit value.
+	if _, n := readVarint([]byte{
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01,
+	}); n != 0 {
+		t.Fatalf("a varint of eleven bytes was accepted after %d", n)
+	}
+}
+
+func TestWriteFrameRefusesAnOversizedResponse(t *testing.T) {
+	var out bytes.Buffer
+	w := bufio.NewWriter(&out)
+	if err := writeFrame(w, make([]byte, maxFrame+1)); err == nil {
+		t.Fatal("a response above the frame limit must be refused")
+	}
+}
+
+func TestServeReportsAWriteFailure(t *testing.T) {
+	req := requestOf{caseID: "w", operation: opValidate, kind: "siren", input: "012345674"}
+	var in bytes.Buffer
+	frame(&in, req.encode())
+
+	for _, allow := range []int{0, 4} {
+		w := &errWriter{allow: allow, err: errors.New("the pipe is closed")}
+		if err := serve(bytes.NewReader(in.Bytes()), w); err == nil {
+			t.Fatalf("allowing %d bytes: a failing standard output must be reported", allow)
+		}
+	}
+}
+
+func TestAnAmbiguousProfileIsReportedAsAFailure(t *testing.T) {
+	// Canonicalize refuses a profile no definition declares, and the testee
+	// has to carry that back rather than invent a result.
+	resp := exchange(t, requestOf{
+		caseID: "p", operation: opCanonicalize,
+		kind: "siren", input: "012345674", profile: "strict", presentProfile: true,
+	})
+	failure, ok := resp[5]
+	if !ok {
+		t.Fatalf("an unknown profile must be a failure, got fields %v", keys(resp))
+	}
+	if k := varintOf(t, fields(t, failure)[1]); k != failureInternalError {
+		t.Fatalf("failure kind %d", k)
+	}
+}
+
+func TestAnUnexpectedLoadErrorBecomesAFailure(t *testing.T) {
+	// encodeLoad maps the two documented refusals and reports anything else as
+	// a failure rather than claiming a refusal it did not get.
+	body := encodeLoad("x", nil, errors.New("something the generator never returns"))
+	m := fields(t, body)
+	failure, ok := m[5]
+	if !ok {
+		t.Fatalf("an undocumented error must become a failure, got fields %v", keys(m))
+	}
+	if k := varintOf(t, fields(t, failure)[1]); k != failureInternalError {
+		t.Fatalf("failure kind %d", k)
 	}
 }
