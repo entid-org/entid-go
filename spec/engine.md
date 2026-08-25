@@ -1,13 +1,13 @@
-# LibBusinessID — Contrat commun des moteurs
+# EntID — Contrat commun des moteurs
 
 ## 1. Objet
 
-Ce document définit le comportement normatif de tous les moteurs LibBusinessID :
+Ce document définit le comportement normatif de tous les moteurs EntID :
 
-- `businessid-go` ;
-- `businessid-swift` ;
-- `businessid-kotlin` ;
-- `businessid-typescript`.
+- `entid-go` ;
+- `entid-swift` ;
+- `entid-kotlin` ;
+- `entid-typescript`.
 
 Il est indépendant d’un langage. Les documents `engine-<langage>.md` complètent ce
 contrat avec les conventions, outils et APIs propres à chaque écosystème.
@@ -17,12 +17,12 @@ normatifs.
 
 Un moteur est responsable de :
 
-1. charger et valider défensivement un `businessid-rules.binpb` ;
+1. charger et valider défensivement un `entid-rules.binpb` ;
 2. exposer une API idiomatique ;
 3. dispatcher puis canonicaliser une entrée selon les deux phases normatives ;
 4. exécuter format puis checksum selon les règles communes ;
 5. produire le contrat de résultat commun ;
-6. exécuter la suite `businessid-conformance.binpb` ;
+6. exécuter la suite `entid-conformance.binpb` ;
 7. prévoir une interface de registre sans implémentation réseau en V1.
 
 Un moteur n’analyse jamais HCL et ne contient aucune règle nationale codée en dur.
@@ -36,7 +36,7 @@ L’implémentation d’un moteur NE DOIT PAS commencer avec ce seul document. L
 - `rules.proto` et `conformance.proto` ;
 - `ir.md`, qui spécifie exhaustivement chaque opcode et invariant ;
 - `features.md`, qui fige le contenu exact de chaque capability ID ;
-- `businessid-rules.binpb`, `businessid-conformance.binpb`, leur manifeste,
+- `entid-rules.binpb`, `entid-conformance.binpb`, leur manifeste,
   `SHA256SUMS` et leur attestation ;
 - les fixtures minimales valides et invalides du décodeur.
 
@@ -51,7 +51,7 @@ Un moteur NE DOIT PAS interpréter le bundle à l’exécution. Le travail se s�
 deux :
 
 - un **générateur**, que vous écrivez, s’exécute à la construction du moteur. Il lit
-  `businessid-rules.binpb`, applique les vingt-cinq contrôles de chargement de
+  `entid-rules.binpb`, applique les vingt-cinq contrôles de chargement de
   `ir.md` section 10, et émet du code source dans votre langage. Il refuse de produire
   quoi que ce soit s’il ne comprend pas une version, un champ, un opcode ou une
   capacité.
@@ -90,7 +90,7 @@ statuts `unsupported` et `not_run` sont des résultats normaux.
 
 ## 3. Terminologie
 
-- **bundle** : artefact `businessid-rules.binpb` ;
+- **bundle** : artefact `entid-rules.binpb` ;
 - **règles version** : version métier `YYYY.MM.PATCH` ;
 - **format version** : version entière de l’IR ;
 - **moteur** : runtime d’un langage ;
@@ -664,7 +664,7 @@ le reste.
 
 ### 11.1 Source exécutée
 
-Chaque moteur consomme `businessid-conformance.binpb` correspondant exactement au
+Chaque moteur consomme `entid-conformance.binpb` correspondant exactement au
 `rules.lock`. Le hash doit être vérifié lors de la mise à jour du dépôt.
 
 Tous les cas communs sont obligatoires. Un moteur ne peut pas exclure un cas pour
@@ -681,8 +681,8 @@ commit que `rules.lock` enregistre sous `source_commit`, donc au même commit qu
 corpus :
 
 ```bash
-go run github.com/libbusinessid/spec/cmd/conformance-runner@<source_commit> \
-  -corpus spec/businessid-conformance.binpb -- ./mon-testee
+go run github.com/entid-org/spec/cmd/conformance-runner@<source_commit> \
+  -corpus spec/entid-conformance.binpb -- ./mon-testee
 ```
 
 Aucune release n'est nécessaire, rien n'est à télécharger à la main, et le seul
@@ -692,6 +692,14 @@ n'entre ni dans le paquet publié ni dans ses dépendances.
 `actions/setup-go` pose `GOTOOLCHAIN: local`, ce qui interdit de récupérer une
 toolchain. L'étape du runner doit donc poser `GOTOOLCHAIN: auto` ; le testee, lui,
 reste construit avec la toolchain épinglée du moteur.
+
+**Sur l'étape, pas sur le workflow.** `setup-go` n'écrit pas la variable dans son
+propre environnement : il l'exporte par `$GITHUB_ENV`, ce qui l'emporte sur les
+blocs `env` du workflow et du job. Un `GOTOOLCHAIN: auto` posé en tête de fichier
+vaut donc pour les étapes qui précèdent `setup-go` et pour aucune de celles qui le
+suivent — dont les seules qui exécutent Go. Le moteur TypeScript l'a mesuré en
+lisant l'environnement à chaque étape : `auto` avant, `local` après, et **rien
+n'échouait**, ce qui est exactement pourquoi personne ne l'aurait vu.
 
 La condition exacte est la ligne `go` du module `spec`, pas sa ligne `toolchain` :
 c'est la première qui lie. Un moteur épinglant un Go antérieur échoue sur la
@@ -757,6 +765,107 @@ exigée :
 
 Les requêtes de ces tests sont inventées sur place : le test d'honnêteté n'ouvre
 pas le corpus non plus, sinon il démontrerait le contraire de ce qu'il affirme.
+
+## 11.4 Le moteur se synchronise lui-même
+
+Quand `spec` publie une release, **c'est le moteur qui va la chercher**, pas la
+release qui vient le trouver.
+
+Chaque moteur porte un workflow de synchronisation. Il se déclenche sur une
+horloge et à la demande, compare la release la plus récente de `spec` à son propre
+`rules.lock`, et ne fait rien quand elles concordent.
+
+**La plus récente, pas « latest ».** Tant que la stabilité n'est pas `stable`, le
+workflow de release marque chaque publication comme pré-release, et l'endpoint
+`releases/latest` de GitHub les exclut — `gh release view` répond « release not
+found » alors que la release existe. Un moteur qui interroge cet endpoint ne se
+synchroniserait jamais pendant toute la phase alpha. Il liste les releases et
+prend la plus récente qui n'est pas un brouillon. Sinon il fait, dans cet
+ordre :
+
+1. télécharge les artefacts de la release ;
+2. vérifie les `SHA256SUMS`, **puis l'attestation de provenance** — propriétaire,
+   dépôt, workflow signataire et tag ;
+3. écrit `spec/`, `rules.lock` et `spec/PROVENANCE.md` — **les contrats en prose
+   compris**, `spec.md`, `engine.md` et son `engine-<langage>.md`, que la release
+   publie et atteste au même titre que les schémas. La note de provenance est
+   publiée assemblée, une par moteur : un moteur qui a vérifié une release n'a
+   ainsi rien à cloner pour écrire le dernier fichier de sa synchronisation ;
+4. **régénère le code émis** ;
+5. exécute le point d'entrée de la section 12.6 ;
+6. ouvre une pull request avec le tout, verte ou rouge.
+
+Rien n'est écrit avant que l'étape 2 ne passe. Une release dont l'attestation ne
+vérifie pas ne doit pas même toucher l'arbre de travail.
+
+### Pourquoi le moteur et pas la release
+
+**La régénération demande la chaîne d'outils du moteur**, que `spec` n'a pas et
+n'aura jamais : ni Gradle, ni SwiftPM, ni pnpm. Une release qui pousse chez les
+moteurs ouvre donc structurellement des pull requests incomplètes — elle livre le
+bundle et laisse le code émis sur l'ancienne version, ce qui a produit quatre
+CI rouges à la première release.
+
+**Et elle supprime un secret à portée croisée.** Pour pousser une branche chez
+quatre moteurs, `spec` devait détenir un jeton en écriture sur les quatre. Un
+moteur qui se synchronise lui-même écrit chez lui, avec le jeton que GitHub lui
+donne déjà. Un secret de moins, et le rayon d'action d'une compromission de
+`spec` s'arrête à `spec`.
+
+C'est aussi pour cela que le déclenchement est une horloge et non un événement
+poussé : un `repository_dispatch` reprendrait d'une main le jeton qu'on retire de
+l'autre. La latence d'une horloge quotidienne est le prix de cette propriété, et
+le déclenchement manuel existe pour le jour où elle coûte trop cher.
+
+### Ce que devient une pull request rouge
+
+Une nouvelle règle métier ne demande aucun changement de générateur : c'est de la
+donnée, et le code émis suit. La pull request est donc verte par défaut, et elle
+se merge sur ses propres mérites.
+
+Elle passe au rouge quand la release apporte quelque chose que le moteur ne sait
+pas encore faire — une capacité qu'il ne déclare pas, un contrôle de chargement
+qu'il n'applique pas, une sémantique qu'il lit autrement. **Le tri se fait donc
+tout seul** : le mécanique passe sans intervention, et ce qui reste rouge est
+exactement ce qui méritait un humain ou un agent. Personne n'a à décider à
+l'avance de quel côté tombe une release.
+
+Une pull request rouge n'est jamais mergée pour débloquer la chaîne. Elle est
+corrigée, ou la release est refusée avec la raison écrite.
+
+### Verte, elle se merge seule
+
+Le workflow active l'auto-merge sur la pull request qu'il ouvre. Une synchronisation
+mécanique n'a alors besoin de personne : la release paraît, chaque moteur la
+récupère, régénère, se vérifie et se met à jour. Ce qui demande une attention est
+exactement ce qui est resté rouge.
+
+Trois conditions, et un moteur qui n'en remplit pas une le dit plutôt que de
+contourner :
+
+- l'auto-merge doit être autorisé sur le dépôt, et une protection de branche doit
+  exiger le verdict du point d'entrée de la section 12.6 ; sans elle, l'auto-merge
+  fusionne dès que rien ne le bloque, ce qui n'est pas la même chose que sur vert ;
+- **le point d'entrée est la seule vérification exigée**, sinon « vert » aurait
+  deux définitions et l'auto-merge suivrait la plus faible ;
+- le tag et la publication restent manuels. Merger du code vérifié et publier un
+  paquet ne sont pas le même acte, et le second est le seul irréversible.
+
+**Le verdict est publié par le workflow lui-même, en statut de commit.** Une pull
+request ouverte avec le `GITHUB_TOKEN` d'un dépôt ne déclenche aucun workflow
+`pull_request` — GitHub coupe là pour empêcher une action de se rappeler en boucle.
+Une protection exigeant un check qui ne démarre jamais laisserait donc chaque
+synchronisation en attente éternelle, et l'auto-merge ne partirait pas.
+
+Le workflow exécute déjà le point d'entrée : il en publie le résultat comme statut
+de commit, sous le nom que la protection exige. Le verdict existe et porte le nom
+attendu sans qu'un second workflow ait à le recalculer, et sans jeton plus large
+puisqu'un dépôt écrit ses propres statuts. Le moteur Kotlin a mesuré le blocage et
+l'a laissé à trancher plutôt que de le contourner.
+
+Un moteur qui ne peut pas activer l'auto-merge avec le jeton dont il dispose nomme
+le réglage qui manque. Il ne demande pas un secret plus large : le rayon d'action
+réduit est ce que cette section a acheté.
 
 ## 12. Exigences qualité
 
@@ -848,7 +957,7 @@ Lorsque l’écosystème le permet, appliquer le mutation testing aux checksums,
 comparaisons de positions, bornes et dispatch. Objectif recommandé : mutation score
 ≥ 80 % sur le cœur, avec analyse des mutants survivants.
 
-## 12.5 Une seule commande, silencieuse quand tout passe
+### 12.6 Une seule commande, silencieuse quand tout passe
 
 Chaque moteur expose **un point d'entrée unique** qui exécute toute sa vérification :
 empreintes du lock, régénération du code émis, compilation, tests, conformité contre
@@ -963,12 +1072,39 @@ chaînes en minuscules définies dans ce document.
 Le dépôt contient :
 
 ```text
-Sources/Resources/.../businessid-rules.binpb
-Tests/Resources/.../businessid-conformance.binpb
+Sources/Resources/.../entid-rules.binpb
+Tests/Resources/.../entid-conformance.binpb
 rules.lock
 ```
 
 Le chemin exact varie selon le langage.
+
+`rules.lock` porte exactement ces champs, dans cet ordre :
+
+```lock-fields
+rules_version
+format_version
+rules_sha256
+conformance_sha256
+conformance_jsonl_sha256
+rules_proto_sha256
+conformance_proto_sha256
+testee_proto_sha256
+ir_doc_sha256
+features_doc_sha256
+stability
+source_commit
+```
+
+Cette liste est normative. Un moteur vérifie chaque champ que le lock déclare,
+donc un champ qu'un écrivain porte et qu'un autre omet est une release que les
+moteurs refusent -- c'est arrivé : `conformance_jsonl_sha256` a existé d'un côté
+seulement, et la première release a livré un lock de sept digests là où les
+quatre moteurs en vérifient huit.
+
+`attestation_identity` s'ajoute en treizième position sur une release attestée,
+et sur elle seule. Une synchronisation locale ne l'invente pas : elle laisse un
+commentaire à sa place, pour qu'une absence se lise plutôt qu'elle ne se devine.
 
 La PR automatique de mise à jour doit :
 

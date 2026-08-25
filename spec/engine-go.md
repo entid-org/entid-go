@@ -1,8 +1,8 @@
-# Prompt d’implémentation — moteur Go LibBusinessID
+# Prompt d’implémentation — moteur Go EntID
 
 ## Mission
 
-Tu dois implémenter intégralement le dépôt Go du moteur LibBusinessID. Avant toute
+Tu dois implémenter intégralement le dépôt Go du moteur EntID. Avant toute
 modification, lis entièrement `engine.md` situé à côté de ce document. Avant de
 coder, exige et lis aussi `rules.proto`, `conformance.proto`, `ir.md`, `features.md`,
 le manifeste, `SHA256SUMS`, l’attestation et les deux BINPB de la même release. Si un
@@ -27,13 +27,13 @@ port ligne à ligne d’un autre moteur.
 La bibliothèque doit :
 
 - générer, à la construction, le code des canonicalisations, formats et checksums à
-  partir de `businessid-rules.binpb` ;
+  partir de `entid-rules.binpb` ;
 - décoder et valider défensivement l’IR Protobuf **dans le générateur**, en appliquant
   les contrôles de chargement de `ir.md` section 10 et en refusant d’émettre du code
   si l’un échoue ;
 - exécuter canonicalisation, format et checksum depuis le code généré, sans décodeur
   ni machine d’exécution de l’IR dans la bibliothèque publiée ;
-- passer intégralement `businessid-conformance.binpb` ; le testee répond aux cas
+- passer intégralement `entid-conformance.binpb` ; le testee répond aux cas
   `load_ruleset` en appelant le générateur, comme le dit le champ 7 de
   `testee.proto` ;
 - exposer les versions moteur/règles/format et capabilities ;
@@ -42,9 +42,9 @@ La bibliothèque doit :
 
 ## Module et package
 
-- Module attendu : `github.com/libbusinessid/businessid-go`, sauf module déjà fixé
+- Module attendu : `github.com/entid-org/entid-go`, sauf module déjà fixé
   par le dépôt.
-- Le package public principal s’appelle `businessid`.
+- Le package public principal s’appelle `entid`.
 - Le package doit fonctionner avec la version stable de Go déclarée dans `go.mod`.
 - Choisir et documenter une version minimale réaliste ; la CI teste cette version et
   la dernière stable.
@@ -56,7 +56,7 @@ Structure recommandée :
 
 ```text
 .
-├── businessid.go
+├── entid.go
 ├── input.go
 ├── result.go
 ├── reason.go
@@ -70,8 +70,8 @@ Structure recommandée :
 │   ├── canonicalize/
 │   ├── checksum/
 │   └── limits/
-├── cmd/businessid-gen/    # le générateur : lit le bundle, valide, émet rules_gen.go
-├── cmd/businessid-example/
+├── cmd/entid-gen/    # le générateur : lit le bundle, valide, émet rules_gen.go
+├── cmd/entid-example/
 └── integration/
 ```
 
@@ -236,8 +236,8 @@ Le runner de conformité vient de `spec`, jamais de ce dépôt. Il s'exécute é
 commit que `rules.lock` enregistre sous `source_commit` :
 
 ```bash
-go run github.com/libbusinessid/spec/cmd/conformance-runner@<source_commit> \
-  -corpus spec/businessid-conformance.binpb -- ./businessid-testee
+go run github.com/entid-org/spec/cmd/conformance-runner@<source_commit> \
+  -corpus spec/entid-conformance.binpb -- ./entid-testee
 ```
 
 N'écris pas de comparateur : un moteur qui juge lui-même ses propres résultats peut

@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  # One job calling one entry point. Section 12.5 of engine.md asks for a single
+  # One job calling one entry point. Section 12.6 of engine.md asks for a single
   # verification so that "green" cannot mean one thing here and another on a
   # developer's machine: what CI runs is `make verify`, and nothing else.
   verify:

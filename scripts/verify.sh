@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Copyright The LibBusinessID Authors.
+# Copyright The EntID Authors.
 # SPDX-License-Identifier: Apache-2.0
 #
-# One entry point for the whole verification, as section 12.5 of engine.md
+# One entry point for the whole verification, as section 12.6 of engine.md
 # requires: lock digests, regeneration, build, tests, conformance against the
 # runner from spec, lint, format, coverage and its thresholds, packaging.
 #
@@ -63,9 +63,9 @@ digest_of() {
 }
 
 declare -a digest_keys=(
-	"rules_sha256:businessid-rules.binpb"
-	"conformance_sha256:businessid-conformance.binpb"
-	"conformance_jsonl_sha256:businessid-conformance.jsonl"
+	"rules_sha256:entid-rules.binpb"
+	"conformance_sha256:entid-conformance.binpb"
+	"conformance_jsonl_sha256:entid-conformance.jsonl"
 	"rules_proto_sha256:rules.proto"
 	"conformance_proto_sha256:conformance.proto"
 	"testee_proto_sha256:testee.proto"
@@ -139,10 +139,10 @@ run "fuzz smoke" go test . -run FuzzValidate -fuzz FuzzValidate -fuzztime 20s
 # emitted rules cover. That figure describes the corpus, not this engine, which
 # is why it is published below and never gated.
 mkdir -p "$work/covdata"
-run "testee" go build -cover -coverpkg=./... -o "$work/businessid-testee" ./cmd/businessid-testee
+run "testee" go build -cover -coverpkg=./... -o "$work/entid-testee" ./cmd/entid-testee
 GOCOVERDIR="$work/covdata" GOTOOLCHAIN=auto run "conformance" \
-	go run "github.com/libbusinessid/spec/cmd/conformance-runner@$source_commit" \
-	-corpus spec/businessid-conformance.binpb -- "$work/businessid-testee"
+	go run "github.com/entid-org/spec/cmd/conformance-runner@$source_commit" \
+	-corpus spec/entid-conformance.binpb -- "$work/entid-testee"
 grep -q '^conformant$' "$step_log" || fail "conformance" "$(cat "$step_log")"
 conformance_line="$(grep -E '^rules .*cases' "$step_log" | head -1)"
 
@@ -153,7 +153,7 @@ conformance_line="$(grep -E '^rules .*cases' "$step_log" | head -1)"
 run "coverage" go test ./... -coverprofile="$work/coverage.out" -covermode=atomic -coverpkg=./... -timeout 900s
 covered="$(awk 'NR > 1 {
 	if ($1 ~ /rules_gen\.go/) next
-	if ($1 ~ /cmd\/businessid-demo/) next
+	if ($1 ~ /cmd\/entid-demo/) next
 	stmt[$1] = $2
 	if ($3 > 0) hit[$1] = 1
 }
@@ -247,7 +247,7 @@ PROBE
 		GOTOOLCHAIN=auto go get golang.org/x/mod@latest >/dev/null 2>&1 &&
 		GOTOOLCHAIN=auto go build -o zipcheck .
 ) >"$work/zipbuild.log" 2>&1 || fail "packaging" "$(cat "$work/zipbuild.log")"
-run "packaging" "$work/zip/zipcheck" "$PWD" "$work/module.zip" github.com/libbusinessid/businessid-go
+run "packaging" "$work/zip/zipcheck" "$PWD" "$work/module.zip" github.com/entid-org/entid-go
 zip_line="$(cat "$step_log")"
 
 printf 'verify ok — rules %s, %s, coverage %s hand-written (generated %s%%, published not gated), lint %s, %s, module zip %s\n' \

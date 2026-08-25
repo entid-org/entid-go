@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package gen_test
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/libbusinessid/businessid-go/internal/gen"
+	"github.com/entid-org/entid-go/internal/gen"
 )
 
 // A bundle is untrusted input, and the branches that refuse a damaged one are
@@ -486,7 +486,7 @@ func loadOutcome(body []byte) (b *gen.Bundle, panicked any, err error) {
 // Mutations that cannot leave a loadable bundle are marked as such and must be
 // refused rather than merely survived.
 func TestWireMutationsAreAnswered(t *testing.T) {
-	shipped := readSpecFile(t, "businessid-rules.binpb")
+	shipped := readSpecFile(t, "entid-rules.binpb")
 	synthetic := allOpcodesBundle().encode()
 	t.Logf("shipped bundle %d bytes, synthetic bundle %d bytes", len(shipped), len(synthetic))
 
@@ -534,7 +534,7 @@ func TestWireMutationsAreAnswered(t *testing.T) {
 				}
 				// An accepted bundle has to be usable, or the loader let
 				// through something the emitter cannot handle.
-				if _, err := gen.Generate(b, "businessid"); err != nil {
+				if _, err := gen.Generate(b, "entid"); err != nil {
 					t.Fatalf("%s: accepted, then failed to generate: %v", m.name, err)
 				}
 			}

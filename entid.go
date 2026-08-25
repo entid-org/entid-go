@@ -1,13 +1,13 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package businessid canonicalizes and validates business identifiers offline:
+// Package entid canonicalizes and validates business identifiers offline:
 // VAT numbers, EUID, the national company number of every EU member state,
 // SIREN, SIRET, LEI, USCC, CNPJ, DUNS, EORI and EIN.
 //
-//	engine := businessid.New()
+//	engine := entid.New()
 //
-//	report, err := engine.Validate(businessid.Input{
+//	report, err := engine.Validate(entid.Input{
 //		Kind:  "vat",
 //		Value: "BE 0123.456.749",
 //	})
@@ -18,7 +18,7 @@
 //	fmt.Println(report.Format.Status)    // valid
 //	fmt.Println(report.Checksum.Status)  // valid
 //
-// The rules come from a signed bundle compiled by the LibBusinessID spec
+// The rules come from a signed bundle compiled by the EntID spec
 // repository, and are compiled into this package as Go code when the engine is
 // built. Nothing is interpreted at run time, nothing is downloaded, and no
 // register is ever contacted.
@@ -55,9 +55,9 @@
 // and rejecting on it would reject every German VAT number in existence.
 //
 //	switch report.Checksum.Status {
-//	case businessid.Valid:
+//	case entid.Valid:
 //		// The check digit holds.
-//	case businessid.Invalid:
+//	case entid.Invalid:
 //		// A documented rule proved this value wrong. Safe to reject.
 //	default:
 //		// No verdict. Fall back to the format result, or to a register.
@@ -100,7 +100,7 @@
 // [Engine.Coverage] lists every definition this engine implements, with the
 // authority, source URL, access date and tier behind each rule.
 // [Engine.RulesVersion] identifies the bundle they were compiled from.
-package businessid
+package entid
 
 import (
 	"errors"

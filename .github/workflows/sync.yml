@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag of libbusinessid/spec (default: the most recent release)'
+        description: 'Release tag of entid-org/spec (default: the most recent release)'
         required: false
         type: string
 
@@ -28,7 +28,7 @@ jobs:
     permissions:
       contents: write # push the synchronization branch
       pull-requests: write # open it, and enable auto-merge on it
-      statuses: write # report the section 12.5 run on the pushed commit
+      statuses: write # report the section 12.6 run on the pushed commit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,7 +57,7 @@ jobs:
           GOTOOLCHAIN: auto
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
-      # Step 5, the section 12.5 entry point. It does not stop the run: section
+      # Step 5, the section 12.6 entry point. It does not stop the run: section
       # 11.4 asks for the pull request to be opened green or red, and a release
       # the engine cannot yet follow is precisely the one a human must see.
       - name: Verify

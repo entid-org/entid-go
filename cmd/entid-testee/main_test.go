@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -239,7 +239,7 @@ func TestLoadRulesetIsAnsweredByTheGenerator(t *testing.T) {
 }
 
 func TestLoadRulesetAcceptsTheShippedBundle(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "spec", "businessid-rules.binpb"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "spec", "entid-rules.binpb"))
 	if err != nil {
 		t.Fatal(err)
 	}

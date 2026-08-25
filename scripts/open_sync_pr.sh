@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright The LibBusinessID Authors.
+# Copyright The EntID Authors.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Step 6 of engine.md section 11.4: commit what scripts/sync_release.sh wrote,
@@ -24,8 +24,8 @@ writer_ref="$5"
 repo="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is not set}"
 run_url="${GITHUB_SERVER_URL:-https://github.com}/${repo}/actions/runs/${GITHUB_RUN_ID:-0}"
 
-git config user.name "libbusinessid-bot"
-git config user.email "bot@libbusinessid.invalid"
+git config user.name "entid-bot"
+git config user.email "bot@entid.invalid"
 
 # -C rather than -c: a re-run after a fixed defect lands on the branch it made
 # last time instead of refusing to create it.
@@ -52,7 +52,7 @@ else
 	git push --quiet --set-upstream origin "${branch}"
 fi
 
-# The §12.5 entry point already ran, on this exact commit, in the step before
+# The §12.6 entry point already ran, on this exact commit, in the step before
 # this one. It is reported here as a commit status because GitHub does not start
 # a workflow for a pull request opened with GITHUB_TOKEN — "events triggered by
 # the GITHUB_TOKEN will not create a new workflow run" — so ci.yml never fires
@@ -75,7 +75,7 @@ gh api --method POST "repos/${repo}/statuses/${head}" \
 
 body="$(
 	cat <<BODY
-Automated synchronization of the LibBusinessID rules, per section 11.4 of \`engine.md\`.
+Automated synchronization of the EntID rules, per section 11.4 of \`engine.md\`.
 
 - rules version: \`${version}\`
 - source tag: \`${tag}\`
@@ -83,7 +83,7 @@ Automated synchronization of the LibBusinessID rules, per section 11.4 of \`engi
 - emitted code: regenerated from the new bundle by this run
 - \`make verify\`: **${verify}** — [run](${run_url})
 
-The verification above is the section 12.5 entry point, run on this commit and
+The verification above is the section 12.6 entry point, run on this commit and
 reported as the \`verify\` status. A red pull request is not merged to unblock
 the chain: it is fixed, or the release is refused with the reason written down.
 BODY
@@ -93,7 +93,7 @@ if [ "${writer_ref}" != "refs/tags/${tag}" ]; then
 
 Note: \`refs/tags/${tag}\` carries no \`tools/write_provenance.sh\`, so
 \`spec/PROVENANCE.md\` was assembled with the writer from \`${writer_ref}\`. Its
-inputs — the bundle, the templates and \`cmd/businessidc\` — still come from the
+inputs — the bundle, the templates and \`cmd/entidc\` — still come from the
 tagged commit."
 fi
 

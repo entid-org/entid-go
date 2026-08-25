@@ -1,7 +1,7 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-// Command businessid-gen compiles a LibBusinessID rule bundle into Go source.
+// Command entid-gen compiles a EntID rule bundle into Go source.
 //
 // It runs when the engine is built, never when the engine validates an
 // identifier. A bundle that does not satisfy the IR contract stops it here,
@@ -9,7 +9,7 @@
 //
 // Usage:
 //
-//	businessid-gen -bundle spec/businessid-rules.binpb -lock rules.lock -out rules_gen.go
+//	entid-gen -bundle spec/entid-rules.binpb -lock rules.lock -out rules_gen.go
 package main
 
 import (
@@ -22,21 +22,21 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/libbusinessid/businessid-go/internal/gen"
+	"github.com/entid-org/entid-go/internal/gen"
 )
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "businessid-gen: %v\n", err)
+		fmt.Fprintf(os.Stderr, "entid-gen: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run() error {
-	bundlePath := flag.String("bundle", "spec/businessid-rules.binpb", "path to the compiled rule bundle")
+	bundlePath := flag.String("bundle", "spec/entid-rules.binpb", "path to the compiled rule bundle")
 	lockPath := flag.String("lock", "rules.lock", "path to rules.lock, whose digests the bundle must match")
 	outPath := flag.String("out", "rules_gen.go", "path of the Go file to write")
-	pkg := flag.String("package", "businessid", "package name of the generated file")
+	pkg := flag.String("package", "entid", "package name of the generated file")
 	flag.Parse()
 
 	raw, err := os.ReadFile(*bundlePath)
@@ -63,7 +63,7 @@ func run() error {
 	if err := os.WriteFile(*outPath, src, 0o644); err != nil { //nolint:gosec // generated source, not a secret
 		return fmt.Errorf("write %s: %w", *outPath, err)
 	}
-	fmt.Fprintf(os.Stderr, "businessid-gen: wrote %s (%d bytes) from rules %s\n",
+	fmt.Fprintf(os.Stderr, "entid-gen: wrote %s (%d bytes) from rules %s\n",
 		*outPath, len(src), bundle.RulesVersion)
 	return nil
 }

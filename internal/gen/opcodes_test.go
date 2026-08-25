@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package gen_test
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/libbusinessid/businessid-go/internal/gen"
+	"github.com/entid-org/entid-go/internal/gen"
 )
 
 // allOpcodesBundle exercises every one of the 63 V1 operations and every variant of them, including the
@@ -210,7 +210,7 @@ func TestEveryOpcodeLoadsAndGenerates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a bundle using every operation must load: %v", err)
 	}
-	src, err := gen.Generate(b, "businessid")
+	src, err := gen.Generate(b, "entid")
 	if err != nil {
 		t.Fatalf("a bundle using every operation must generate: %v", err)
 	}
@@ -418,7 +418,7 @@ func TestLeftPadIsBounded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a left_pad at the bound must load: %v", err)
 	}
-	if _, err := gen.Generate(loaded, "businessid"); err != nil {
+	if _, err := gen.Generate(loaded, "entid"); err != nil {
 		t.Fatalf("a left_pad at the bound must generate: %v", err)
 	}
 }
@@ -439,7 +439,7 @@ func TestOversizedWorkspaceIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the bundle itself is valid: %v", err)
 	}
-	if _, err := gen.Generate(loaded, "businessid"); err == nil {
+	if _, err := gen.Generate(loaded, "entid"); err == nil {
 		t.Fatal("a canonicalizer beyond the derived margin must be refused")
 	} else if !strings.Contains(err.Error(), "a single conforming step can add") {
 		t.Fatalf("diagnostic %q does not explain the bound", err)
@@ -504,7 +504,7 @@ func TestSourceTier(t *testing.T) {
 		if got := b.Identifiers[0].Sources[0].Tier; got != tc.want {
 			t.Errorf("tier %d decoded as %v, want %v", tc.tier, got, tc.want)
 		}
-		src, err := gen.Generate(b, "businessid")
+		src, err := gen.Generate(b, "entid")
 		if err != nil {
 			t.Fatalf("tier %d: %v", tc.tier, err)
 		}

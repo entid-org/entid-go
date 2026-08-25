@@ -1,7 +1,7 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package gen reads a LibBusinessID rule bundle, validates it against the IR
+// Package gen reads a EntID rule bundle, validates it against the IR
 // contract, and emits Go source implementing its rules.
 //
 // It runs when the engine is built, never when the engine validates an

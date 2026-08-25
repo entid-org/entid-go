@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package gen_test
@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/libbusinessid/businessid-go/internal/gen"
+	"github.com/entid-org/entid-go/internal/gen"
 )
 
 func TestLoadShippedBundle(t *testing.T) {
-	b, err := gen.Load(readSpecFile(t, "businessid-rules.binpb"))
+	b, err := gen.Load(readSpecFile(t, "entid-rules.binpb"))
 	if err != nil {
 		t.Fatalf("the shipped bundle must load: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestLoadRefusesEmptyPayloadAsIncompatible(t *testing.T) {
 
 func TestLoadRefusesUnknownRootField(t *testing.T) {
 	// Field 999, wire type 0, value 1 appended to the shipped bundle.
-	forged := append(append([]byte(nil), readSpecFile(t, "businessid-rules.binpb")...), 0xb8, 0x3e, 0x01)
+	forged := append(append([]byte(nil), readSpecFile(t, "entid-rules.binpb")...), 0xb8, 0x3e, 0x01)
 	if _, err := gen.Load(forged); !errors.Is(err, gen.ErrInvalidRuleset) {
 		t.Fatalf("expected invalid_ruleset, got %v", err)
 	}
@@ -134,14 +134,14 @@ func TestLoadRefusesUnknownRootField(t *testing.T) {
 
 func TestLoadRefusesReservedField(t *testing.T) {
 	// Field 5 is reserved for the removed generated_at.
-	forged := append(append([]byte(nil), readSpecFile(t, "businessid-rules.binpb")...), 0x28, 0x01)
+	forged := append(append([]byte(nil), readSpecFile(t, "entid-rules.binpb")...), 0x28, 0x01)
 	if _, err := gen.Load(forged); !errors.Is(err, gen.ErrInvalidRuleset) {
 		t.Fatalf("expected invalid_ruleset for a reserved field, got %v", err)
 	}
 }
 
 func TestLoadRefusesTruncatedBundle(t *testing.T) {
-	raw := readSpecFile(t, "businessid-rules.binpb")
+	raw := readSpecFile(t, "entid-rules.binpb")
 	if _, err := gen.Load(raw[:len(raw)/2]); !errors.Is(err, gen.ErrInvalidRuleset) {
 		t.Fatalf("expected invalid_ruleset, got %v", err)
 	}
@@ -155,7 +155,7 @@ func TestLoadRefusesTruncatedBundle(t *testing.T) {
 func TestVersionChecksPrecedeUnknownFields(t *testing.T) {
 	// The shipped bundle, plus a field no V1 message declares, at three
 	// depths: the root, a definition, and a source.
-	raw := readSpecFile(t, "businessid-rules.binpb")
+	raw := readSpecFile(t, "entid-rules.binpb")
 
 	t.Run("unknown capability wins over an unknown root field", func(t *testing.T) {
 		forged := append(append([]byte(nil), raw...), 0xb8, 0x3e, 0x01) // field 999, varint 1
@@ -196,6 +196,12 @@ func TestVersionChecksPrecedeUnknownFields(t *testing.T) {
 // The fragments are short on purpose. They identify the rule, not its wording,
 // so rephrasing a diagnostic does not churn this table while a fixture that
 // starts being answered by a different rule does fail.
+//
+// They carry no figure the corpus decides either. loader-truncated-001 used to
+// be matched on "exceeds the 190 remaining bytes", and 190 is where that
+// fixture happens to stop: re-encoding the bundle it is truncated from moved it
+// to 180 at rules 2026.08.38, with the same rule answering both times. The
+// fragment left is emitted at one place only, in protowire.go.
 var answeringRule = map[string]string{
 	"loader-alphabet-empty-031":              "the custom alphabet is empty",
 	"loader-alphabet-missing-033":            "reads a custom alphabet but carries none",
@@ -225,7 +231,7 @@ var answeringRule = map[string]string{
 	"loader-stray-parameter-019":             "which does not declare it",
 	"loader-stray-when-branch-022":           "has a WHEN branch as its root",
 	"loader-subject-node-circular-037":       "which reads the subject it defines",
-	"loader-truncated-001":                   "exceeds the 190 remaining bytes",
+	"loader-truncated-001":                   "remaining bytes",
 	"loader-type-mismatch-012":               "declares output type string but",
 	"loader-unbounded-digits-to-integer-020": "got no provable bound",
 	"loader-undeclared-feature-006":          "capability 2 is used but not declared",

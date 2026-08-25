@@ -1,7 +1,7 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package businessid
+package entid
 
 // Profile selects how strict a validation is about historical variants.
 //

@@ -1,20 +1,20 @@
-# LibBusinessID — Spécification du dépôt `spec`
+# EntID — Spécification du dépôt `spec`
 
 ## 1. Statut et objectif du document
 
 Ce document est la spécification d’implémentation complète du dépôt
-`github.com/libbusinessid/spec`. Il doit permettre à un agent de développement de
+`github.com/entid-org/spec`. Il doit permettre à un agent de développement de
 créer le dépôt depuis zéro sans inventer d’architecture, de contrat ou de politique
 de compatibilité non décrit ici.
 
 Les mots **DOIT**, **NE DOIT PAS**, **DEVRAIT**, **NE DEVRAIT PAS** et **PEUT** sont
 normatifs.
 
-Le dépôt `spec` est la source de vérité de LibBusinessID. Il contient :
+Le dépôt `spec` est la source de vérité de EntID. Il contient :
 
 - le langage HCL utilisé pour écrire les définitions d’identifiants ;
 - les schémas Protobuf de l’IR et des cas de conformité ;
-- le compilateur/linker `businessidc`, écrit en Go ;
+- le compilateur/linker `entidc`, écrit en Go ;
 - les règles officielles de format et de checksum ;
 - les cas de conformité communs aux moteurs Go, Swift, Kotlin et TypeScript ;
 - un interpréteur de référence utilisé uniquement pour vérifier la spécification ;
@@ -152,7 +152,7 @@ La V1 ne couvre pas :
 - téléchargement dynamique de règles par les moteurs par défaut.
 
 La première release stable DEVRAIT migrer la couverture hors ligne du dépôt Go
-historique `hyperscale-stack/businessid`, après vérification de chaque source et de
+historique `hyperscale-stack/entid`, après vérification de chaque source et de
 chaque vecteur. Une règle historique ne doit pas être copiée sans provenance.
 
 ## 4. Architecture générale
@@ -168,7 +168,7 @@ rules/*.hcl + conformance/*.jsonl
                  │
         ┌────────┴─────────┐
         ▼                  ▼
-businessid-rules.binpb  conformance.binpb
+entid-rules.binpb  conformance.binpb
         │                  │
         │                  └──────────────┐
         ▼                                 ▼
@@ -184,7 +184,7 @@ moteur publié = code généré ◀──── testé ──┘
 ```
 
 HCL est uniquement un langage d’auteur. Aucun moteur de production n’analyse HCL.
-Toutes les références symboliques sont résolues par `businessidc`.
+Toutes les références symboliques sont résolues par `entidc`.
 
 Le bundle est destiné à être consommé par un générateur au moment où le moteur est
 construit, et non par le moteur au moment où il valide un identifiant. Ce dépôt
@@ -219,9 +219,8 @@ La structure cible est :
 │   ├── workflows/
 │   │   ├── ci.yml
 │   │   ├── release.yml
-│   │   └── downstream.yml
 │   └── dependabot.yml
-├── cmd/businessidc/
+├── cmd/entidc/
 ├── cmd/conformance-runner/
 ├── internal/
 │   ├── ast/
@@ -234,7 +233,7 @@ La structure cible est :
 │   ├── conformance/
 │   ├── reference/
 │   └── diagnostics/
-├── proto/libbusinessid/
+├── proto/entid/
 │   ├── ir/v1/rules.proto
 │   ├── conformance/v1/conformance.proto
 │   └── testee/v1/testee.proto
@@ -265,19 +264,19 @@ Le code généré DOIT être reproductible avec les versions d’outils verrouil
 fichiers HCL et JSONL sont édités manuellement ; les `.binpb`, manifestes, tables de
 couverture et documents sous `docs/generated/` sont générés.
 
-## 6. Le langage HCL LibBusinessID
+## 6. Le langage HCL EntID
 
 ### 6.1 Choix de conception
 
 Le langage utilise HCL v2 natif. HCL fournit la syntaxe, les expressions et les
-diagnostics de position ; LibBusinessID définit toute la sémantique.
+diagnostics de position ; EntID définit toute la sémantique.
 
 Le compilateur utilise une approche en deux passes :
 
 1. découverte des fichiers, symboles, labels et dépendances ;
 2. résolution typée, détection des cycles et construction de l’IR.
 
-Il n’existe **aucun mécanisme d’import en V1**. `businessidc` découvre récursivement
+Il n’existe **aucun mécanisme d’import en V1**. `entidc` découvre récursivement
 les fichiers `*.hcl` sous `rules/`, les trie par chemin relatif POSIX puis les analyse
 comme une seule unité de compilation et une seule table de symboles globale. Il
 ignore uniquement les répertoires cachés ainsi que `dist/` et `vendor/`. Les liens
@@ -416,7 +415,7 @@ Une opération hors limites ou impossible est une erreur de canonicalisation int
 pas un résultat `invalid`. Le compilateur DOIT rejeter les opérations manifestement
 impossibles statiquement.
 
-La canonicalisation doit être idempotente. `businessidc lint` DOIT vérifier cette
+La canonicalisation doit être idempotente. `entidc lint` DOIT vérifier cette
 propriété sur tous les cas de conformité et sur des valeurs générées.
 
 L'idempotence est énoncée sur les entrées valides, c'est-à-dire sur de l'UTF-8
@@ -808,11 +807,11 @@ compilateur refuse les symlinks, calcule son chemin relatif à la racine, rempla
 séparateurs par `/`, exige UTF-8 sans BOM, normalise CRLF et CR en LF sans retirer
 commentaires ni espaces, puis trie les entrées par ordre lexicographique des octets
 UTF-8 du chemin. Le flux hashé commence par les octets ASCII
-`LIBBUSINESSID-SOURCE-V1\n`, puis, pour chaque fichier : longueur du chemin sur
+`ENTID-SOURCE-V1\n`, puis, pour chaque fichier : longueur du chemin sur
 8 octets non signés big-endian, chemin UTF-8, longueur du contenu normalisé sur
 8 octets non signés big-endian, contenu. Aucun séparateur implicite n’est ajouté.
 Le digest des règles couvre tous les `rules/**/*.hcl`. Celui de conformité utilise
-le domaine `LIBBUSINESSID-CONFORMANCE-SOURCE-V1\n` et couvre tous les JSONL ainsi
+le domaine `ENTID-CONFORMANCE-SOURCE-V1\n` et couvre tous les JSONL ainsi
 que les fixtures incorporées, avec le même encodage.
 
 Les chemins du flux sont virtuels et indépendants du checkout : une source de règle
@@ -1350,8 +1349,8 @@ sous `source_commit` — le même commit que le corpus, ce qui rend impossible d
 juger un corpus avec le comparateur d'un autre :
 
 ```bash
-go run github.com/libbusinessid/spec/cmd/conformance-runner@<source_commit> \
-  -corpus spec/businessid-conformance.binpb -- ./mon-testee
+go run github.com/entid-org/spec/cmd/conformance-runner@<source_commit> \
+  -corpus spec/entid-conformance.binpb -- ./mon-testee
 ```
 
 Aucune release n'est nécessaire et rien n'est à télécharger à la main. Le seul
@@ -1389,19 +1388,19 @@ moteur généré répond aux cas d’exécution, et son générateur répond aux
 chargement. Dans les deux cas, la totalité du corpus est couverte : aucun cas n’est
 sans destinataire.
 
-## 9. CLI `businessidc`
+## 9. CLI `entidc`
 
 La CLI doit proposer :
 
 ```text
-businessidc fmt [paths...]
-businessidc lint [paths...]
-businessidc compile --rules rules --cases conformance --out dist
-businessidc verify --rules rules --cases conformance
-businessidc inspect dist/businessid-rules.binpb
-businessidc diff old.binpb new.binpb
-businessidc check-generated
-businessidc version
+entidc fmt [paths...]
+entidc lint [paths...]
+entidc compile --rules rules --cases conformance --out dist
+entidc verify --rules rules --cases conformance
+entidc inspect dist/entid-rules.binpb
+entidc diff old.binpb new.binpb
+entidc check-generated
+entidc version
 ```
 
 ### 9.1 Exigences CLI
@@ -1428,10 +1427,10 @@ publiés, manifestes et documents générés.
 Une release des règles publie :
 
 ```text
-businessid-rules-YYYY.MM.PATCH.binpb
-businessid-conformance-YYYY.MM.PATCH.binpb
-businessid-conformance-YYYY.MM.PATCH.jsonl.gz
-businessid-manifest-YYYY.MM.PATCH.json
+entid-rules-YYYY.MM.PATCH.binpb
+entid-conformance-YYYY.MM.PATCH.binpb
+entid-conformance-YYYY.MM.PATCH.jsonl.gz
+entid-manifest-YYYY.MM.PATCH.json
 rules.proto
 conformance.proto
 ir.md
@@ -1463,7 +1462,7 @@ répertoires temporaires distincts avant publication.
 
 La release utilise une identité OIDC de workflow GitHub Actions et produit une
 attestation Sigstore/GitHub Artifact Attestation liée au dépôt
-`libbusinessid/spec`, au commit, au tag protégé et au workflow de release attendu.
+`entid-org/spec`, au commit, au tag protégé et au workflow de release attendu.
 Le job de build n’a que `contents: read` ; un job distinct, protégé par environnement,
 reçoit `id-token: write`, `attestations: write` et la permission minimale de publier.
 Les tags de release sont immuables et protégés ; aucun secret longue durée ne signe
@@ -1479,13 +1478,21 @@ sont hors périmètre V1.
 
 ## 11. Synchronisation des dépôts moteurs
 
-Après publication d’une release :
+Après publication d’une release, **le moteur va la chercher ; la release ne
+pousse rien**. Chaque dépôt moteur porte un workflow `rules-sync` déclenché par
+une horloge, et non par un événement émis depuis `spec` : un `repository_dispatch`
+rendrait d’une main le jeton inter-dépôts que cette inversion retire de l’autre.
+`spec` n’a donc aucun droit d’écriture sur les quatre moteurs, et le rayon
+d’impact d’une compromission de `spec` s’arrête à `spec`. Le prix est une journée
+de latence au pire ; le déclenchement manuel existe pour le jour où elle coûte
+trop cher.
 
-1. `downstream.yml` ouvre une PR dans `businessid-go`, `businessid-swift`,
-   `businessid-kotlin` et `businessid-typescript` ;
-2. la PR met à jour `rules.lock`, et lui seul ;
+1. le workflow `rules-sync` de `entid-go`, `entid-swift`, `entid-kotlin` et
+   `entid-typescript` découvre la nouvelle release et ouvre une PR chez lui ;
+2. la PR met à jour `rules.lock` et le code généré ;
 3. le générateur du moteur récupère les artefacts de la release désignée, vérifie
-   tous les SHA-256 et l’attestation, puis régénère le code ;
+   tous les SHA-256 et l’attestation, puis régénère le code — la régénération
+   demande la chaîne d’outils du moteur, que `spec` n’a pas et n’aura pas ;
 4. le code généré est committé ; les artefacts binaires ne le sont pas ;
 5. chaque CI exécute toute la conformité et ses tests propres ;
 6. aucune publication de package n’est automatique avant succès de ses quality gates.
@@ -1521,7 +1528,7 @@ testee_proto_sha256 = "..."
 ir_doc_sha256 = "..."
 features_doc_sha256 = "..."
 source_commit = "..."
-attestation_identity = "libbusinessid/spec/.github/workflows/release.yml@refs/tags/..."
+attestation_identity = "entid-org/spec/.github/workflows/release.yml@refs/tags/..."
 ```
 
 Le lock est généré depuis le manifeste attesté ; l’automatisation ne peut pas
@@ -1655,7 +1662,7 @@ Une PR de règle est recevable uniquement si elle inclut :
 - source officielle ou justification documentée ;
 - cas valides et invalides ;
 - analyse du risque de faux négatif ;
-- résultat de `businessidc diff` ;
+- résultat de `entidc diff` ;
 - mise à jour de provenance ;
 - conformité complète verte ;
 - absence de restriction involontaire des formats existants.
@@ -1712,7 +1719,8 @@ Le dépôt V1 est terminé lorsque :
   écart lorsqu’une réponse diffère, y compris sur un seul champ ;
 - le protocole de testee est documenté et son schéma est publié, de sorte qu’une
   implémentation tierce puisse se déclarer conforme sans modifier ce dépôt ;
-- une release de test peut ouvrir les quatre PR downstream ;
+- une release de test est découverte par les quatre moteurs, qui ouvrent chacun
+  leur PR de synchronisation ;
 - le pilote couvre toutes les familles d’opérations nécessaires ;
 - README, CONTRIBUTING, SECURITY, DATA_POLICY et guide de langage permettent une
   contribution autonome.

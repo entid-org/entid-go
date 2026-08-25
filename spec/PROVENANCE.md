@@ -1,8 +1,8 @@
 # Where these files come from, and what to build
 
-Copied from `github.com/libbusinessid/spec` at commit
-`b264614ff7f1d95a945128578e54e18225a90f0a`, rules version
-`2026.08.33`, stability `alpha`.
+Copied from `github.com/entid-org/spec` at commit
+`70c408b66e2cb3533c472607a47024c2fc12c753`, rules version
+`2026.08.38`, stability `alpha`.
 
 ## What this engine is — and is not
 
@@ -10,7 +10,7 @@ Copied from `github.com/libbusinessid/spec` at commit
 machine. The specification (sections 2.2 and 4) splits the work in two:
 
 - a **generator**, which you write, runs when the engine is built. It reads
-  `spec/businessid-rules.binpb`, validates it, and emits source code in this
+  `spec/entid-rules.binpb`, validates it, and emits source code in this
   language.
 - the **engine**, which is what ships: the generated code, a small set of
   support primitives it calls, and a public API written by hand.
@@ -35,9 +35,9 @@ requires a republication of the engine for every rules version.
 | `spec/features.md` | The 18 frozen capability IDs. |
 | `spec/rules.proto` | Schema of the rules bundle — the generator's input. |
 | `spec/conformance.proto` | Schema of the conformance corpus. |
-| `spec/businessid-rules.binpb` | The bundle to generate from. |
-| `spec/businessid-conformance.binpb` | The conformance corpus, authoritative form. |
-| `spec/businessid-conformance.jsonl` | Same corpus, readable, for development. |
+| `spec/entid-rules.binpb` | The bundle to generate from. |
+| `spec/entid-conformance.binpb` | The conformance corpus, authoritative form. |
+| `spec/entid-conformance.jsonl` | Same corpus, readable, for development. |
 | `rules.lock` | Declared digests of every file above. |
 
 The bundle lives here only until the first release is tagged. After that, the
@@ -109,8 +109,12 @@ cases address the engine through the protocol above.
 ## Verifying integrity
 
 Every digest in `rules.lock` is a SHA-256 of the corresponding file. Verify them
-before starting. `rules.lock` carries no `attestation_identity` because no
-release exists yet; its header explains this.
+before starting.
+
+`attestation_identity` names the workflow and tag that produced these files, and
+its presence is what distinguishes an attested release from a local build. When
+it is there, verify the attestation itself and not only the digests: digests
+prove the files did not change, an attestation proves who made them.
 
 
 ## Language-specific traps
