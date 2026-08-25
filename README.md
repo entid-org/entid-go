@@ -251,7 +251,15 @@ internal/runtime + the public API   what ships
 ```
 
 `rules.lock` is the only coupling point with the spec repository: it names a
-release and attests its content. When it changes, a maintainer regenerates:
+release and attests its content. Keeping it current is not a maintainer's job.
+`.github/workflows/sync.yml` runs on a daily clock and on demand: it compares
+the latest release of `spec` with the lock, does nothing when they agree, and
+otherwise verifies the artifacts — `SHA256SUMS`, then the provenance
+attestation — rewrites `spec/`, regenerates, runs `make verify` and opens a pull
+request with the lot, green or red. Nothing is written before the attestation
+verifies, and nothing in `spec` holds a token for this repository.
+
+Regenerating by hand is for a lock edited by hand:
 
 ```sh
 go generate ./...

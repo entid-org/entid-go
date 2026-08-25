@@ -1,0 +1,90 @@
+name: sync
+
+# Section 11.4 of engine.md: when spec publishes a release, the engine goes and
+# gets it. The trigger is a clock rather than a pushed event on purpose — a
+# repository_dispatch would hand back with one hand the cross-repository token
+# this design takes away with the other. A day of latency is the price of that
+# property, and the manual trigger exists for the day it costs too much.
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag of libbusinessid/spec (default: the most recent release)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the synchronization branch
+      pull-requests: write # open it, and enable auto-merge on it
+      statuses: write # report the section 12.5 run on the pushed commit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Not shallow: the push takes a lease on the branch it replaces, and a
+          # shallow clone cannot establish the relationship a lease needs — it
+          # refuses with "stale info" instead.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Steps 1 to 4: download, verify the digests then the attestation, write
+      # spec/ + rules.lock + spec/PROVENANCE.md, regenerate the emitted code.
+      # It exits having done nothing when rules.lock already records the release.
+      - name: Fetch the release, verify it, and regenerate
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: ./scripts/sync_release.sh "${TAG}"
+
+      - name: Install the linter
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GOTOOLCHAIN: auto
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+
+      # Step 5, the section 12.5 entry point. It does not stop the run: section
+      # 11.4 asks for the pull request to be opened green or red, and a release
+      # the engine cannot yet follow is precisely the one a human must see.
+      - name: Verify
+        id: verify
+        if: steps.sync.outputs.changed == 'true'
+        continue-on-error: true
+        run: make verify
+
+      # Step 6.
+      - name: Open the pull request
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.sync.outputs.version }}
+          TAG: ${{ steps.sync.outputs.tag }}
+          BRANCH: ${{ steps.sync.outputs.branch }}
+          OUTCOME: ${{ steps.verify.outcome }}
+          WRITER_REF: ${{ steps.sync.outputs.writer_ref }}
+        run: ./scripts/open_sync_pr.sh "${VERSION}" "${TAG}" "${BRANCH}" "${OUTCOME}" "${WRITER_REF}"
+
+      # And the run itself is red when the verification was, so a red release is
+      # visible without opening the pull request to find out.
+      # `!cancelled()` rather than the implicit success(): a step that opens the
+      # pull request and then fails on something else would otherwise skip this
+      # one, and a red verification would go unreported behind it.
+      - name: Report the verification
+        if: '!cancelled() && steps.verify.outcome == ''failure'''
+        run: |
+          echo "::error::make verify failed on the synchronized tree; the pull request is open and red"
+          exit 1
