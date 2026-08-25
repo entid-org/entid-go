@@ -101,13 +101,19 @@ manifest="${art}/entid-manifest-${version}.json"
 
 # 2b. And then the attestation, which is what makes the digests worth anything:
 # SHA256SUMS is a file in the same release, so on its own it vouches for nobody.
-# The three artifacts below are the attested ones; every other file that lands
-# under spec/ has its digest in the manifest, so `make verify` re-checks it
-# against what was written.
+# It is therefore attested first, and that is what carries the rest: every file
+# copied below was checked against it in 2a, and the prose contracts section 11.4
+# step 3 added — spec.md, engine.md, engine-go.md — carry no manifest digest, so
+# without this they would rest on an unsigned list. The bundle, the corpus and
+# the manifest are attested individually as well; they are the bytes that decide
+# what this engine emits, and one check each is cheap. Every remaining file has
+# its digest in the attested manifest, so `make verify` re-checks it against what
+# was written.
 #
 # --repo, never --owner as well: gh refuses the two together, and the release
 # side found that out by having the step fail before it verified anything.
 for artifact in \
+	"SHA256SUMS" \
 	"entid-rules-${version}.binpb" \
 	"entid-conformance-${version}.binpb" \
 	"entid-manifest-${version}.json"; do
@@ -196,13 +202,13 @@ cp "${art}/entid-conformance-${version}.binpb" spec/entid-conformance.binpb
 # SOURCE_DATE_EPOCH and its digest would move with the source commit while its
 # content did not. conformance_jsonl_sha256 is taken on what lands here.
 gzip -dc "${art}/entid-conformance-${version}.jsonl.gz" >spec/entid-conformance.jsonl
-# spec.md, engine.md and engine-go.md carry no manifest digest, so `make verify`
-# does not re-check them; they are still copied, because they used to arrive by
-# the release pushing into this repository and that job no longer exists. Left
-# out, the mirror would hold documents from one release beside a bundle from
-# another for good — and spec/PROVENANCE.md, which the release itself writes,
-# names spec/spec.md as the document that governs. SHA256SUMS covers them, and
-# it was checked before anything here was written.
+# The prose contracts are on this list because section 11.4 step 3 puts them
+# there: a synchronization writes "spec/, rules.lock et spec/PROVENANCE.md — les
+# contrats en prose compris, spec.md, engine.md et son engine-<langage>.md". They
+# used to arrive by the release pushing into this repository, and that job no
+# longer exists, so left out they would stay behind for good: documents from one
+# release beside a bundle from another. They carry no manifest digest, which is
+# why 2b attests SHA256SUMS rather than the artifacts alone.
 for schema in rules.proto conformance.proto testee.proto ir.md features.md \
 	spec.md engine.md engine-go.md; do
 	cp "${art}/${schema}" "spec/${schema}"
