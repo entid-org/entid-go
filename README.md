@@ -285,14 +285,14 @@ it drives, over the protocol of `spec/testee.proto`:
 ```sh
 go build -o bin/entid-testee ./cmd/entid-testee
 
-# from the spec repository
-go run ./cmd/conformance-runner \
-    --corpus dist/entid-conformance-2026.08.22.binpb \
-    -- /path/to/entid-testee
+# the runner, pinned to the source_commit rules.lock records
+go run github.com/entid-org/spec/cmd/conformance-runner@<source_commit> \
+    -corpus spec/entid-conformance.binpb \
+    -- bin/entid-testee
 ```
 
 ```
-rules 2026.08.22: 666 cases, 666 matched, 0 differed
+rules 2026.08.38: 676 cases, 676 matched, 0 differed
 conformant
 ```
 
@@ -301,7 +301,7 @@ The testee never reads the corpus and never sees an expected result; it echoes
 the case identifier so a desynchronized exchange is detected, and uses it for
 nothing else.
 
-The 35 `load_ruleset` cases address the generator rather than the engine, since
+The 38 `load_ruleset` cases address the generator rather than the engine, since
 this engine loads no bundle at run time. The testee routes them to it, and
 `go test ./internal/gen` covers them too.
 

@@ -1,9 +1,9 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-// Package libbusinessid.testee.v1 defines the wire protocol between the
+// Package entid.testee.v1 defines the wire protocol between the
 // conformance runner and an engine under test.
 //
 // The runner is the only program that reads expected results. A testee
@@ -21,18 +21,18 @@ syntax = "proto3";
 // The testee echoes the case identifier so that a desynchronized exchange is
 // detected rather than silently scoring the wrong case. It must not use the
 // identifier for anything else.
-package libbusinessid.testee.v1;
+package entid.testee.v1;
 
-import "libbusinessid/conformance/v1/conformance.proto";
-import "libbusinessid/ir/v1/rules.proto";
+import "entid/conformance/v1/conformance.proto";
+import "entid/ir/v1/rules.proto";
 
-option go_package = "github.com/libbusinessid/spec/gen/go/libbusinessid/testee/v1;testeev1";
+option go_package = "github.com/entid-org/spec/gen/go/entid/testee/v1;testeev1";
 
 // TesteeRequest is one unit of work handed to a testee.
 message TesteeRequest {
   // Identifier of the conformance case, echoed back in the response.
   string case_id = 1;
-  libbusinessid.conformance.v1.Operation operation = 2;
+  entid.conformance.v1.Operation operation = 2;
   string input = 3;
   // Absent when the caller expresses no preference. Section 5.2 of ir.md makes
   // that absence meaningful: it is what lets a definition's default_profile
@@ -67,8 +67,8 @@ message ObservedCanonicalization {
   string kind = 1;
   string canonical_value = 2;
   optional string country_code = 3;
-  libbusinessid.conformance.v1.StepStatus status = 4;
-  libbusinessid.ir.v1.ReasonCode reason_code = 5;
+  entid.conformance.v1.StepStatus status = 4;
+  entid.ir.v1.ReasonCode reason_code = 5;
 }
 
 // ObservedValidationReport is the report the engine produced.
@@ -82,8 +82,8 @@ message ObservedValidationReport {
 
 // ObservedStep is one validation level as the engine resolved it.
 message ObservedStep {
-  libbusinessid.conformance.v1.StepStatus status = 1;
-  libbusinessid.ir.v1.ReasonCode reason_code = 2;
+  entid.conformance.v1.StepStatus status = 1;
+  entid.ir.v1.ReasonCode reason_code = 2;
   // The message key the rule carries, absent when the result was produced
   // before any rule assertion. engine.md section 11.2 states that the common
   // tests compare the code and the key; without this field they compared only

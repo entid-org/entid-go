@@ -1,7 +1,9 @@
 // This directory is a mirror of the specification repository, copied file by
-// file by its tools/sync_engines.sh. It is an input to the generator, which
-// reads it from disk at build time, and to the tests; no published package
-// reads any of it.
+// file by scripts/sync_release.sh. It used to be pushed here by the spec
+// repository's tools/sync_engines.sh; that job was removed, and section 11.4
+// leaves the engine fetching the release as the only way in. It is an input to
+// the generator, which reads it from disk at build time, and to the tests; no
+// published package reads any of it.
 //
 // The go.mod is what keeps it out of the published module. A Go module zip
 // carries every file under the module root, so without this file a consumer

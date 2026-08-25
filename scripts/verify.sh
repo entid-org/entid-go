@@ -2,7 +2,7 @@
 # Copyright The EntID Authors.
 # SPDX-License-Identifier: Apache-2.0
 #
-# One entry point for the whole verification, as section 12.5 of engine.md
+# One entry point for the whole verification, as section 12.6 of engine.md
 # requires: lock digests, regeneration, build, tests, conformance against the
 # runner from spec, lint, format, coverage and its thresholds, packaging.
 #
@@ -141,7 +141,7 @@ run "fuzz smoke" go test . -run FuzzValidate -fuzz FuzzValidate -fuzztime 20s
 mkdir -p "$work/covdata"
 run "testee" go build -cover -coverpkg=./... -o "$work/entid-testee" ./cmd/entid-testee
 GOCOVERDIR="$work/covdata" GOTOOLCHAIN=auto run "conformance" \
-	go run "github.com/libbusinessid/spec/cmd/conformance-runner@$source_commit" \
+	go run "github.com/entid-org/spec/cmd/conformance-runner@$source_commit" \
 	-corpus spec/entid-conformance.binpb -- "$work/entid-testee"
 grep -q '^conformant$' "$step_log" || fail "conformance" "$(cat "$step_log")"
 conformance_line="$(grep -E '^rules .*cases' "$step_log" | head -1)"

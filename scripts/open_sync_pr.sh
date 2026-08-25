@@ -52,7 +52,7 @@ else
 	git push --quiet --set-upstream origin "${branch}"
 fi
 
-# The §12.5 entry point already ran, on this exact commit, in the step before
+# The §12.6 entry point already ran, on this exact commit, in the step before
 # this one. It is reported here as a commit status because GitHub does not start
 # a workflow for a pull request opened with GITHUB_TOKEN — "events triggered by
 # the GITHUB_TOKEN will not create a new workflow run" — so ci.yml never fires
@@ -83,7 +83,7 @@ Automated synchronization of the EntID rules, per section 11.4 of \`engine.md\`.
 - emitted code: regenerated from the new bundle by this run
 - \`make verify\`: **${verify}** — [run](${run_url})
 
-The verification above is the section 12.5 entry point, run on this commit and
+The verification above is the section 12.6 entry point, run on this commit and
 reported as the \`verify\` status. A red pull request is not merged to unblock
 the chain: it is fixed, or the release is refused with the reason written down.
 BODY

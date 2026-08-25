@@ -180,7 +180,7 @@ func TestNoRunnerLivesHere(t *testing.T) {
 	}
 
 	// The checks live in the verification script, and the workflow calls it:
-	// section 12.5 of engine.md asks for one entry point so that green has one
+	// section 12.6 of engine.md asks for one entry point so that green has one
 	// definition. Both are read, so neither can drift away from the other.
 	script, err := os.ReadFile(filepath.Join("scripts", "verify.sh"))
 	if err != nil {
@@ -196,7 +196,7 @@ func TestNoRunnerLivesHere(t *testing.T) {
 	}
 
 	// The script must fetch the runner from the spec module.
-	const runner = "github.com/libbusinessid/spec/cmd/conformance-runner@"
+	const runner = "github.com/entid-org/spec/cmd/conformance-runner@"
 	if !strings.Contains(ci, runner) {
 		t.Fatalf("the workflow never runs %s", runner)
 	}
@@ -266,9 +266,9 @@ func moduleFiles(t *testing.T) []string {
 // half the archive - for code that never opens any of it.
 //
 // The go.mod under spec/ makes it a module of its own, which the parent's zip
-// excludes. The generator still reads the files from disk, and sync_engines.sh
-// copies file by file without erasing the directory, so the go.mod survives a
-// resynchronization.
+// excludes. The generator still reads the files from disk, and
+// scripts/sync_release.sh copies file by file without erasing the directory, so
+// the go.mod survives a resynchronization.
 func TestPublishedModuleCarriesNoSpecMirror(t *testing.T) {
 	// The mirror must still be there: a test that passed because the files had
 	// been deleted would prove the opposite of what it claims.
@@ -349,6 +349,59 @@ func TestRulesLockDigestsMatchTheMirror(t *testing.T) {
 		if got, want := hex.EncodeToString(sum[:]), lockValue(t, key); got != want {
 			t.Errorf("%s: spec/%s hashes to %s, rules.lock declares %s", key, name, got, want)
 		}
+	}
+}
+
+// TestRulesLockCarriesTheFieldsEngineMdNames covers section 16 of engine.md,
+// which since 2026.08.38 carries the list of lock fields, in order, in a fenced
+// lock-fields block, and calls it normative. The list is read from the mirrored
+// document rather than repeated here: a lock this engine writes and a lock
+// another engine writes have to agree, and the only way to be sure of that is to
+// compare both against the same source. The reason the specification gives is a
+// measurement, not a worry — conformance_jsonl_sha256 once existed on one side
+// only, and the first release shipped seven digests where four engines checked
+// eight.
+//
+// The thirteenth field is asserted too. Section 16 adds attestation_identity in
+// thirteenth position "sur une release attestée, et sur elle seule", and this
+// repository synchronizes attested releases only: scripts/sync_release.sh
+// verifies the attestation before it writes anything, so a lock without that
+// field here was written by hand.
+func TestRulesLockCarriesTheFieldsEngineMdNames(t *testing.T) {
+	doc, err := os.ReadFile(filepath.Join("spec", "engine.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := regexp.MustCompile("(?s)```lock-fields\n(.*?)\n```").FindSubmatch(doc)
+	if block == nil {
+		t.Fatal("spec/engine.md carries no lock-fields block, so this test compares against nothing")
+	}
+	want := strings.Fields(string(block[1]))
+	if len(want) == 0 {
+		t.Fatal("the lock-fields block of spec/engine.md is empty")
+	}
+	want = append(want, "attestation_identity")
+
+	raw, err := os.ReadFile("rules.lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, _, ok := strings.Cut(line, "=")
+		if !ok {
+			t.Errorf("rules.lock carries %q, which declares no field", line)
+			continue
+		}
+		got = append(got, strings.TrimSpace(key))
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("rules.lock declares\n\t%s\nand section 16 of engine.md names\n\t%s",
+			strings.Join(got, ", "), strings.Join(want, ", "))
 	}
 }
 

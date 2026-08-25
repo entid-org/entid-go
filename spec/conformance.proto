@@ -1,18 +1,18 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-// Package libbusinessid.conformance.v1 defines the shared conformance suite
+// Package entid.conformance.v1 defines the shared conformance suite
 // consumed by every engine. It is generated from the reviewed JSONL corpus and
 // must never be edited by hand.
-package libbusinessid.conformance.v1;
+package entid.conformance.v1;
 
-import "libbusinessid/ir/v1/rules.proto";
+import "entid/ir/v1/rules.proto";
 
-option go_package = "github.com/libbusinessid/spec/gen/go/libbusinessid/conformance/v1;conformancev1";
+option go_package = "github.com/entid-org/spec/gen/go/entid/conformance/v1;conformancev1";
 
-// ConformanceBundle is the root message of `businessid-conformance.binpb`.
+// ConformanceBundle is the root message of `entid-conformance.binpb`.
 message ConformanceBundle {
   uint32 format_version = 1;
   string rules_version = 2;
@@ -60,7 +60,7 @@ message ExpectedCanonicalization {
   string rules_version = 6;
   uint32 format_version = 7;
   StepStatus status = 8;
-  libbusinessid.ir.v1.ReasonCode reason_code = 9;
+  entid.ir.v1.ReasonCode reason_code = 9;
   optional string message_key = 10;
 }
 
@@ -81,7 +81,7 @@ message ExpectedValidationReport {
 message ExpectedStep {
   ValidationLevel level = 1;
   StepStatus status = 2;
-  libbusinessid.ir.v1.ReasonCode reason_code = 3;
+  entid.ir.v1.ReasonCode reason_code = 3;
   optional string message_key = 4;
 }
 

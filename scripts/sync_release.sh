@@ -196,7 +196,15 @@ cp "${art}/entid-conformance-${version}.binpb" spec/entid-conformance.binpb
 # SOURCE_DATE_EPOCH and its digest would move with the source commit while its
 # content did not. conformance_jsonl_sha256 is taken on what lands here.
 gzip -dc "${art}/entid-conformance-${version}.jsonl.gz" >spec/entid-conformance.jsonl
-for schema in rules.proto conformance.proto testee.proto ir.md features.md; do
+# spec.md, engine.md and engine-go.md carry no manifest digest, so `make verify`
+# does not re-check them; they are still copied, because they used to arrive by
+# the release pushing into this repository and that job no longer exists. Left
+# out, the mirror would hold documents from one release beside a bundle from
+# another for good — and spec/PROVENANCE.md, which the release itself writes,
+# names spec/spec.md as the document that governs. SHA256SUMS covers them, and
+# it was checked before anything here was written.
+for schema in rules.proto conformance.proto testee.proto ir.md features.md \
+	spec.md engine.md engine-go.md; do
 	cp "${art}/${schema}" "spec/${schema}"
 done
 cp "${work}/rules.lock" rules.lock

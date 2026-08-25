@@ -1,17 +1,17 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-// Package libbusinessid.ir.v1 defines the LibBusinessID intermediate
+// Package entid.ir.v1 defines the EntID intermediate
 // representation (IR) consumed by every engine. The exhaustive normative
 // semantics of every message, enum value and execution limit is published in
 // docs/ir.md, which is generated from the same registry as this schema.
-package libbusinessid.ir.v1;
+package entid.ir.v1;
 
-option go_package = "github.com/libbusinessid/spec/gen/go/libbusinessid/ir/v1;irv1";
+option go_package = "github.com/entid-org/spec/gen/go/entid/ir/v1;irv1";
 
-// RuleBundle is the root message of `businessid-rules.binpb`.
+// RuleBundle is the root message of `entid-rules.binpb`.
 //
 // The bundle carries no timestamp: `generatedAt` only exists in the external
 // manifest and is derived from SOURCE_DATE_EPOCH.

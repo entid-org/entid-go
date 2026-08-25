@@ -196,6 +196,12 @@ func TestVersionChecksPrecedeUnknownFields(t *testing.T) {
 // The fragments are short on purpose. They identify the rule, not its wording,
 // so rephrasing a diagnostic does not churn this table while a fixture that
 // starts being answered by a different rule does fail.
+//
+// They carry no figure the corpus decides either. loader-truncated-001 used to
+// be matched on "exceeds the 190 remaining bytes", and 190 is where that
+// fixture happens to stop: re-encoding the bundle it is truncated from moved it
+// to 180 at rules 2026.08.38, with the same rule answering both times. The
+// fragment left is emitted at one place only, in protowire.go.
 var answeringRule = map[string]string{
 	"loader-alphabet-empty-031":              "the custom alphabet is empty",
 	"loader-alphabet-missing-033":            "reads a custom alphabet but carries none",
@@ -225,7 +231,7 @@ var answeringRule = map[string]string{
 	"loader-stray-parameter-019":             "which does not declare it",
 	"loader-stray-when-branch-022":           "has a WHEN branch as its root",
 	"loader-subject-node-circular-037":       "which reads the subject it defines",
-	"loader-truncated-001":                   "exceeds the 190 remaining bytes",
+	"loader-truncated-001":                   "remaining bytes",
 	"loader-type-mismatch-012":               "declares output type string but",
 	"loader-unbounded-digits-to-integer-020": "got no provable bound",
 	"loader-undeclared-feature-006":          "capability 2 is used but not declared",
