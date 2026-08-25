@@ -1,14 +1,14 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package businessid_test
+package entid_test
 
 import (
 	"errors"
 	"fmt"
 	"slices"
 
-	businessid "github.com/libbusinessid/businessid-go"
+	entid "github.com/entid-org/entid-go"
 )
 
 // The identifiers below come from the shared conformance corpus, which
@@ -19,9 +19,9 @@ import (
 // designates a company.
 
 func ExampleEngine_Validate() {
-	engine := businessid.New()
+	engine := entid.New()
 
-	report, err := engine.Validate(businessid.Input{
+	report, err := engine.Validate(entid.Input{
 		Kind:  "vat",
 		Value: "BE 0123.456.749",
 	})
@@ -44,7 +44,7 @@ func ExampleEngine_Validate() {
 // published is Unsupported, never Invalid. Treating Unsupported as a rejection
 // would turn incomplete coverage into a false negative.
 func ExampleEngine_Validate_unpublishedChecksum() {
-	report, _ := businessid.New().Validate(businessid.Input{
+	report, _ := entid.New().Validate(entid.Input{
 		Kind:  "vat",
 		Value: "DE123456789",
 	})
@@ -61,14 +61,14 @@ func ExampleEngine_Validate_unpublishedChecksum() {
 // A country hint disambiguates a value that carries no country prefix, and
 // contradicts one that carries a different country.
 func ExampleEngine_Validate_countryHint() {
-	engine := businessid.New()
+	engine := entid.New()
 
-	hinted, _ := engine.Validate(businessid.Input{
+	hinted, _ := engine.Validate(entid.Input{
 		Kind: "vat", Value: "0123456749", CountryCode: "BE",
 	})
 	fmt.Println("hinted:  ", hinted.CanonicalValue, hinted.Format.Status)
 
-	clashing, _ := engine.Validate(businessid.Input{
+	clashing, _ := engine.Validate(entid.Input{
 		Kind: "vat", Value: "BE0123456749", CountryCode: "FR",
 	})
 	fmt.Println("clashing:", clashing.Format.Status, clashing.Format.Reason)
@@ -81,13 +81,13 @@ func ExampleEngine_Validate_countryHint() {
 // always opt-in: compatible is the normative default, and neither profile
 // changes the canonical form.
 func ExampleEngine_Validate_profiles() {
-	engine := businessid.New()
-	in := businessid.Input{Kind: "vat", Value: "FRK7012345674"}
+	engine := entid.New()
+	in := entid.Input{Kind: "vat", Value: "FRK7012345674"}
 
 	compatible, _ := engine.Validate(in)
 	fmt.Println("compatible:   ", compatible.Format.Status)
 
-	in.Profile = businessid.StrictCurrent
+	in.Profile = entid.StrictCurrent
 	strict, _ := engine.Validate(in)
 	fmt.Println("strict:       ", strict.Format.Status, strict.Format.Reason)
 	fmt.Println("same canonical:", compatible.CanonicalValue == strict.CanonicalValue)
@@ -100,7 +100,7 @@ func ExampleEngine_Validate_profiles() {
 // Canonicalize answers "what is this value, normalized" without running any
 // rule. It is what a caller stores, or uses as a key.
 func ExampleEngine_Canonicalize() {
-	got, _ := businessid.New().Canonicalize(businessid.Input{
+	got, _ := entid.New().Canonicalize(entid.Input{
 		Kind:  "lei",
 		Value: "0000-0000-0000-0000-0098",
 	})
@@ -113,7 +113,7 @@ func ExampleEngine_Canonicalize() {
 // behind every rule. It grows with every rules release, so a caller filters it
 // rather than assuming a fixed list.
 func ExampleEngine_Coverage() {
-	for _, c := range businessid.New().Coverage() {
+	for _, c := range entid.New().Coverage() {
 		if c.Kind != "vat" || c.CountryCode != "DE" {
 			continue
 		}
@@ -133,7 +133,7 @@ func ExampleEngine_Coverage() {
 // the user types, where computing a check digit on a half-entered value says
 // nothing useful.
 func ExampleEngine_ValidateFormat() {
-	report, _ := businessid.New().ValidateFormat(businessid.Input{
+	report, _ := entid.New().ValidateFormat(entid.Input{
 		Kind:  "siren",
 		Value: "012345674",
 	})
@@ -149,16 +149,16 @@ func ExampleEngine_ValidateFormat() {
 // Rejecting on Unsupported would turn incomplete coverage into a false
 // negative, so only Invalid justifies refusing a value.
 func ExampleReport() {
-	engine := businessid.New()
+	engine := entid.New()
 
 	for _, value := range []string{"012345674", "012345675", "0123"} {
-		report, _ := engine.Validate(businessid.Input{Kind: "siren", Value: value})
+		report, _ := engine.Validate(entid.Input{Kind: "siren", Value: value})
 
 		switch {
 		case report.OK():
 			fmt.Printf("%s: accepted\n", value)
-		case report.Format.Status == businessid.Invalid,
-			report.Checksum.Status == businessid.Invalid:
+		case report.Format.Status == entid.Invalid,
+			report.Checksum.Status == entid.Invalid:
 			fmt.Printf("%s: rejected, %s\n", value, worstReason(report))
 		default:
 			fmt.Printf("%s: no verdict, %s\n", value, worstReason(report))
@@ -171,8 +171,8 @@ func ExampleReport() {
 }
 
 // worstReason picks the step that decided the outcome.
-func worstReason(r businessid.Report) businessid.Reason {
-	if r.Format.Status != businessid.Valid {
+func worstReason(r entid.Report) entid.Reason {
+	if r.Format.Status != entid.Valid {
 		return r.Format.Reason
 	}
 	return r.Checksum.Reason
@@ -181,7 +181,7 @@ func worstReason(r businessid.Report) businessid.Reason {
 // A message key names an entry in the caller's own catalogue, so that a user
 // facing message can be translated without parsing anything.
 func ExampleStep_messageKey() {
-	report, _ := businessid.New().Validate(businessid.Input{
+	report, _ := entid.New().Validate(entid.Input{
 		Kind:  "vat",
 		Value: "BE01234567",
 	})
@@ -193,7 +193,7 @@ func ExampleStep_messageKey() {
 // A value that is not valid UTF-8, or one above 1024 bytes, is refused before
 // any rule runs and reported verbatim. Both are safety bounds, not verdicts.
 func ExampleEngine_Validate_safetyBounds() {
-	report, _ := businessid.New().Validate(businessid.Input{
+	report, _ := entid.New().Validate(entid.Input{
 		Kind:  "siren",
 		Value: "0123456\xff",
 	})
@@ -208,7 +208,7 @@ func ExampleEngine_Validate_safetyBounds() {
 // Kinds lists what the engine can route, which is what a caller offers in a
 // dropdown rather than hard-coding. The list grows with every rules release.
 func ExampleEngine_Kinds() {
-	kinds := businessid.New().Kinds()
+	kinds := entid.New().Kinds()
 
 	fmt.Println(slices.Contains(kinds, "vat"), slices.Contains(kinds, "lei"))
 	// Output: true true
@@ -217,12 +217,12 @@ func ExampleEngine_Kinds() {
 // An unknown profile is the only error the API raises; every value, however
 // malformed, is answered with a verdict instead.
 func ExampleEngine_Validate_errors() {
-	_, err := businessid.New().Validate(businessid.Input{
+	_, err := entid.New().Validate(entid.Input{
 		Kind:    "siren",
 		Value:   "012345674",
 		Profile: "lenient",
 	})
 
-	fmt.Println(errors.Is(err, businessid.ErrUnknownProfile))
+	fmt.Println(errors.Is(err, entid.ErrUnknownProfile))
 	// Output: true
 }

@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package gen_test
@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/libbusinessid/businessid-go/internal/gen"
+	"github.com/entid-org/entid-go/internal/gen"
 )
 
 // FuzzLoad drives arbitrary bytes through the bundle loader. The bundle is
@@ -19,7 +19,7 @@ import (
 // neither accepted nor typed as refused would leave a caller unable to tell a
 // corrupt artifact from an incompatible one.
 func FuzzLoad(f *testing.F) {
-	f.Add(readSpecCorpus(f, "businessid-rules.binpb"))
+	f.Add(readSpecCorpus(f, "entid-rules.binpb"))
 	for _, fixture := range loadFuzzFixtures(f) {
 		f.Add(fixture)
 	}
@@ -39,7 +39,7 @@ func FuzzLoad(f *testing.F) {
 			}
 			// A bundle the loader accepted must also be generatable: the two
 			// steps agree on what a valid bundle is.
-			if _, err := gen.Generate(bundle, "businessid"); err != nil &&
+			if _, err := gen.Generate(bundle, "entid"); err != nil &&
 				!errors.Is(err, gen.ErrInvalidRuleset) {
 				t.Fatalf("an accepted bundle failed to generate: %v", err)
 			}
@@ -66,7 +66,7 @@ func readSpecCorpus(f *testing.F, name string) []byte {
 // suite carries, which are the shapes a real attacker would start from.
 func loadFuzzFixtures(f *testing.F) [][]byte {
 	f.Helper()
-	raw, err := readSpec("businessid-conformance.binpb")
+	raw, err := readSpec("entid-conformance.binpb")
 	if err != nil {
 		f.Fatal(err)
 	}

@@ -1,7 +1,7 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-// Command businessid-testee exposes this engine to the LibBusinessID
+// Command entid-testee exposes this engine to the EntID
 // conformance runner over the protocol of spec/testee.proto.
 //
 // It reads one request on standard input, writes one response on standard
@@ -25,13 +25,13 @@ import (
 	"io"
 	"os"
 
-	businessid "github.com/libbusinessid/businessid-go"
-	"github.com/libbusinessid/businessid-go/internal/gen"
+	entid "github.com/entid-org/entid-go"
+	"github.com/entid-org/entid-go/internal/gen"
 )
 
 func main() {
 	if err := serve(os.Stdin, os.Stdout); err != nil {
-		fmt.Fprintf(os.Stderr, "businessid-testee: %v\n", err)
+		fmt.Fprintf(os.Stderr, "entid-testee: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -40,7 +40,7 @@ func serve(stdin io.Reader, stdout io.Writer) error {
 	in := bufio.NewReader(stdin)
 	out := bufio.NewWriter(stdout)
 
-	engine := businessid.New()
+	engine := entid.New()
 	for {
 		frame, err := readFrame(in)
 		if errors.Is(err, io.EOF) {
@@ -96,7 +96,7 @@ type request struct {
 }
 
 // answer runs one request through the public API and encodes the response.
-func answer(engine *businessid.Engine, req request) []byte {
+func answer(engine *entid.Engine, req request) []byte {
 	if req.operation == opLoadRuleset {
 		// Section 8.8 addresses these cases to the generator: this engine
 		// compiles its rules ahead of time and never loads a bundle at run
@@ -113,11 +113,11 @@ func answer(engine *businessid.Engine, req request) []byte {
 		return encodeFailure(req.caseID, failureInternalError,
 			`a profile named "" cannot be expressed by this engine`)
 	}
-	in := businessid.Input{
+	in := entid.Input{
 		Kind:        req.kind,
 		Value:       req.input,
 		CountryCode: req.countryCode,
-		Profile:     businessid.Profile(req.profile),
+		Profile:     entid.Profile(req.profile),
 	}
 
 	if req.operation == opCanonicalize {
@@ -129,7 +129,7 @@ func answer(engine *businessid.Engine, req request) []byte {
 	}
 
 	var (
-		got businessid.Report
+		got entid.Report
 		err error
 	)
 	switch req.operation {
@@ -258,7 +258,7 @@ func readVarint(b []byte) (uint64, int) {
 
 // Encoding.
 
-func encodeCanonicalization(caseID string, got businessid.Canonical) []byte {
+func encodeCanonicalization(caseID string, got entid.Canonical) []byte {
 	var body []byte
 	body = appendString(body, 1, got.Kind)
 	body = appendString(body, 2, got.CanonicalValue)
@@ -270,7 +270,7 @@ func encodeCanonicalization(caseID string, got businessid.Canonical) []byte {
 	return wrap(caseID, 2, body)
 }
 
-func encodeReport(caseID string, got businessid.Report) []byte {
+func encodeReport(caseID string, got entid.Report) []byte {
 	var body []byte
 	body = appendString(body, 1, got.Kind)
 	body = appendString(body, 2, got.CanonicalValue)
@@ -282,7 +282,7 @@ func encodeReport(caseID string, got businessid.Report) []byte {
 	return wrap(caseID, 3, body)
 }
 
-func encodeStep(s businessid.Step) []byte {
+func encodeStep(s entid.Step) []byte {
 	body := appendVarint(nil, 1, uint64(s.Status))
 	body = appendVarint(body, 2, uint64(s.Reason))
 	// Field 3 carries the key the rule names, and stays absent when the

@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package runtime_test
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"unsafe"
 
-	rt "github.com/libbusinessid/businessid-go/internal/runtime"
+	rt "github.com/entid-org/entid-go/internal/runtime"
 )
 
 // The workspace a test uses. Real ones are sized by the generator from the

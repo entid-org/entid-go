@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -27,7 +27,7 @@ import (
 func TestTheExampleConsumerRuns(t *testing.T) {
 	// Built once and executed directly: go run reports its own exit status
 	// rather than the program's, so it cannot answer what the program returns.
-	binary := filepath.Join(t.TempDir(), "businessid-demo")
+	binary := filepath.Join(t.TempDir(), "entid-demo")
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build the example consumer: %v\n%s", err, out)

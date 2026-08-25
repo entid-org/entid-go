@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Copyright The LibBusinessID Authors.
+# Copyright The EntID Authors.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Fetch a release of libbusinessid/spec and bring this engine up to it.
+# Fetch a release of entid-org/spec and bring this engine up to it.
 #
 # Section 11.4 of engine.md: the engine goes and gets the release, the release
 # does not come and push into the engine. This script is steps 1 to 4 of that
@@ -21,12 +21,12 @@
 # a release whose attestation does not verify cannot leave a trace here.
 set -euo pipefail
 
-spec_repo="libbusinessid/spec"
+spec_repo="entid-org/spec"
 # The signer identity is written here rather than read from rules.lock: the lock
 # is the file being replaced, so trusting its own claim about who may sign the
 # replacement would close the loop on nothing.
 signer_workflow="${spec_repo}/.github/workflows/release.yml"
-engine="businessid-go"
+engine="entid-go"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${root}"
@@ -94,9 +94,9 @@ gh release download "${tag}" --repo "${spec_repo}" --dir "${art}"
 # 2a. The digests the release publishes for itself.
 (cd "${art}" && check_sums SHA256SUMS)
 
-version="$(sed -n 's/^[0-9a-f]*  businessid-rules-\(.*\)\.binpb$/\1/p' "${art}/SHA256SUMS")"
-[ -n "${version}" ] || fail "SHA256SUMS names no businessid-rules-<version>.binpb"
-manifest="${art}/businessid-manifest-${version}.json"
+version="$(sed -n 's/^[0-9a-f]*  entid-rules-\(.*\)\.binpb$/\1/p' "${art}/SHA256SUMS")"
+[ -n "${version}" ] || fail "SHA256SUMS names no entid-rules-<version>.binpb"
+manifest="${art}/entid-manifest-${version}.json"
 [ -f "${manifest}" ] || fail "the release carries no manifest for ${version}"
 
 # 2b. And then the attestation, which is what makes the digests worth anything:
@@ -108,9 +108,9 @@ manifest="${art}/businessid-manifest-${version}.json"
 # --repo, never --owner as well: gh refuses the two together, and the release
 # side found that out by having the step fail before it verified anything.
 for artifact in \
-	"businessid-rules-${version}.binpb" \
-	"businessid-conformance-${version}.binpb" \
-	"businessid-manifest-${version}.json"; do
+	"entid-rules-${version}.binpb" \
+	"entid-conformance-${version}.binpb" \
+	"entid-manifest-${version}.json"; do
 	gh attestation verify "${art}/${artifact}" \
 		--repo "${spec_repo}" \
 		--signer-workflow "${signer_workflow}" \
@@ -176,7 +176,7 @@ if [ ! -f "${writer}" ]; then
 	# from tools/sync_engines.sh after v0.1.1 was tagged. Only the assembler is
 	# taken from the default branch; every input it reads — the bundle, the
 	# templates under docs/spec/provenance, docs/generated/coverage.md and
-	# cmd/businessidc — still comes from the pinned clone. Measured at the time
+	# cmd/entidc — still comes from the pinned clone. Measured at the time
 	# this was written: those inputs are byte-identical between b264614 (v0.1.1)
 	# and the default branch, so the fallback changes the writer's presence and
 	# nothing else. It retires itself with the next release.
@@ -190,12 +190,12 @@ fi
 
 # 3c. spec/, the lock, the provenance note.
 mkdir -p spec
-cp "${art}/businessid-rules-${version}.binpb" spec/businessid-rules.binpb
-cp "${art}/businessid-conformance-${version}.binpb" spec/businessid-conformance.binpb
+cp "${art}/entid-rules-${version}.binpb" spec/entid-rules.binpb
+cp "${art}/entid-conformance-${version}.binpb" spec/entid-conformance.binpb
 # The corpus ships compressed and lands decompressed, because the archive embeds
 # SOURCE_DATE_EPOCH and its digest would move with the source commit while its
 # content did not. conformance_jsonl_sha256 is taken on what lands here.
-gzip -dc "${art}/businessid-conformance-${version}.jsonl.gz" >spec/businessid-conformance.jsonl
+gzip -dc "${art}/entid-conformance-${version}.jsonl.gz" >spec/entid-conformance.jsonl
 for schema in rules.proto conformance.proto testee.proto ir.md features.md; do
 	cp "${art}/${schema}" "spec/${schema}"
 done

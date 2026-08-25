@@ -1,7 +1,7 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package businessid_test
+package entid_test
 
 import (
 	"crypto/sha256"
@@ -84,12 +84,12 @@ func syncSandbox(t *testing.T) string {
 		`rules_version = "2999.01.0"`,
 		`format_version = 1`,
 		`source_commit = "0000000000000000000000000000000000000000"`,
-		`attestation_identity = "libbusinessid/spec/.github/workflows/release.yml@refs/tags/` + syncLockTag + `"`,
+		`attestation_identity = "entid-org/spec/.github/workflows/release.yml@refs/tags/` + syncLockTag + `"`,
 		"",
 	}, "\n"), 0o644)
 
 	mkdir("spec")
-	write(filepath.Join("spec", "businessid-rules.binpb"), "the bundle already here", 0o644)
+	write(filepath.Join("spec", "entid-rules.binpb"), "the bundle already here", 0o644)
 	write(filepath.Join("spec", "PROVENANCE.md"), "the provenance already here", 0o644)
 	return root
 }
@@ -116,9 +116,9 @@ func syncArtifacts(t *testing.T, honestSums bool) string {
 		`"stability":"alpha",` +
 		`"sourceCommit":"` + strings.Repeat("1", 40) + `"}`
 	files := map[string]string{
-		"businessid-rules-" + version + ".binpb":       "fabricated bundle",
-		"businessid-conformance-" + version + ".binpb": "fabricated corpus",
-		"businessid-manifest-" + version + ".json":     manifest,
+		"entid-rules-" + version + ".binpb":       "fabricated bundle",
+		"entid-conformance-" + version + ".binpb": "fabricated corpus",
+		"entid-manifest-" + version + ".json":     manifest,
 	}
 	var sums strings.Builder
 	for name, content := range files {

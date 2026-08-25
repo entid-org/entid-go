@@ -12,6 +12,6 @@
 //
 // Nothing is ever built from here. The module path is local and unpublished,
 // and the directory holds no Go source at all.
-module github.com/libbusinessid/businessid-go/spec
+module github.com/entid-org/entid-go/spec
 
 go 1.24

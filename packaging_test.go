@@ -1,7 +1,7 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package businessid_test
+package entid_test
 
 import (
 	"crypto/sha256"
@@ -47,7 +47,7 @@ func TestPublishedPackageCarriesNoBundle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("go list: %v\n%s", err, out)
 	}
-	const module = "github.com/libbusinessid/businessid-go"
+	const module = "github.com/entid-org/entid-go"
 	published := 0
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		parts := strings.Split(line, "\t")
@@ -174,7 +174,7 @@ func TestNoRunnerLivesHere(t *testing.T) {
 		}
 	}
 	sort.Strings(commands)
-	want := []string{"businessid-demo", "businessid-gen", "businessid-testee"}
+	want := []string{"entid-demo", "entid-gen", "entid-testee"}
 	if strings.Join(commands, ",") != strings.Join(want, ",") {
 		t.Errorf("this repository builds %v, and may build only %v", commands, want)
 	}
@@ -214,7 +214,7 @@ func TestNoRunnerLivesHere(t *testing.T) {
 	if !regexp.MustCompile(`(?m)source_commit.*rules\.lock|rules\.lock.*source_commit`).MatchString(ci) {
 		t.Error("the workflow never reads source_commit from rules.lock")
 	}
-	if !strings.Contains(ci, "spec/businessid-conformance.binpb") {
+	if !strings.Contains(ci, "spec/entid-conformance.binpb") {
 		t.Error("the workflow runs the runner against no corpus")
 	}
 	// rules.lock itself must carry a commit for the workflow to read.
@@ -274,9 +274,9 @@ func TestPublishedModuleCarriesNoSpecMirror(t *testing.T) {
 	// been deleted would prove the opposite of what it claims.
 	for _, needed := range []string{
 		filepath.Join("spec", "go.mod"),
-		filepath.Join("spec", "businessid-rules.binpb"),
-		filepath.Join("spec", "businessid-conformance.binpb"),
-		filepath.Join("spec", "businessid-conformance.jsonl"),
+		filepath.Join("spec", "entid-rules.binpb"),
+		filepath.Join("spec", "entid-conformance.binpb"),
+		filepath.Join("spec", "entid-conformance.jsonl"),
 	} {
 		if _, err := os.Stat(needed); err != nil {
 			t.Fatalf("%s must exist and be excluded, not be missing: %v", needed, err)
@@ -318,9 +318,9 @@ func TestPublishedModuleCarriesNoSpecMirror(t *testing.T) {
 // 2026.08.26, and engine tests cite its case ids as provenance.
 func TestRulesLockDigestsMatchTheMirror(t *testing.T) {
 	digests := map[string]string{
-		"rules_sha256":             "businessid-rules.binpb",
-		"conformance_sha256":       "businessid-conformance.binpb",
-		"conformance_jsonl_sha256": "businessid-conformance.jsonl",
+		"rules_sha256":             "entid-rules.binpb",
+		"conformance_sha256":       "entid-conformance.binpb",
+		"conformance_jsonl_sha256": "entid-conformance.jsonl",
 		"rules_proto_sha256":       "rules.proto",
 		"conformance_proto_sha256": "conformance.proto",
 		"testee_proto_sha256":      "testee.proto",
@@ -374,7 +374,7 @@ func TestCoverageGateIsDeclared(t *testing.T) {
 		t.Error("the verification declares no 95 per cent gate")
 	}
 	// Exactly two exclusions, each for a stated reason.
-	for _, excluded := range []string{`rules_gen\.go`, `cmd\/businessid-demo`} {
+	for _, excluded := range []string{`rules_gen\.go`, `cmd\/entid-demo`} {
 		if !strings.Contains(ci, excluded) {
 			t.Errorf("the gate does not exclude %s", excluded)
 		}
@@ -408,7 +408,7 @@ func TestCoverageGateIsDeclared(t *testing.T) {
 // about a compiler, which makes it a thing to measure.
 func TestThePublishedPackageNeedsNoInitialization(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "consumer")
-	build := exec.Command(goTool(t), "build", "-o", binary, "./cmd/businessid-demo")
+	build := exec.Command(goTool(t), "build", "-o", binary, "./cmd/entid-demo")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build a consumer of the package: %v\n%s", err, out)
 	}
@@ -424,7 +424,7 @@ func TestThePublishedPackageNeedsNoInitialization(t *testing.T) {
 	if !strings.Contains(symbols, "unicode..inittask") {
 		t.Fatal("no inittask symbol of any kind was found, so the absence of ours proves nothing")
 	}
-	const module = "github.com/libbusinessid/businessid-go"
+	const module = "github.com/entid-org/entid-go"
 	for _, line := range strings.Split(symbols, "\n") {
 		if !strings.Contains(line, "inittask") {
 			continue

@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package gen
@@ -35,7 +35,7 @@ func TestCommentText(t *testing.T) {
 //
 //	go test -v -run TestExpansionProfile ./internal/gen
 func TestExpansionProfile(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "spec", "businessid-rules.binpb"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "spec", "entid-rules.binpb"))
 	if err != nil {
 		t.Fatal(err)
 	}

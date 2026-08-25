@@ -1,14 +1,14 @@
-# businessid-go
+# entid-go
 
 Offline canonicalization and validation of business identifiers — VAT numbers,
 EUID, the national company number of every EU member state, SIREN, SIRET, LEI,
 USCC, CNPJ, DUNS, EORI, EIN — from the rules published by the
-[LibBusinessID spec repository](https://github.com/libbusinessid/spec).
+[EntID spec repository](https://github.com/entid-org/spec).
 
 No network. No registry lookup. No allocation on a clean value.
 
 ```sh
-go get github.com/libbusinessid/businessid-go
+go get github.com/entid-org/entid-go
 ```
 
 ```go
@@ -17,13 +17,13 @@ package main
 import (
 	"fmt"
 
-	businessid "github.com/libbusinessid/businessid-go"
+	entid "github.com/entid-org/entid-go"
 )
 
 func main() {
-	engine := businessid.New()
+	engine := entid.New()
 
-	report, err := engine.Validate(businessid.Input{
+	report, err := engine.Validate(entid.Input{
 		Kind:  "vat",
 		Value: "BE 0123.456.749",
 	})
@@ -38,7 +38,7 @@ func main() {
 }
 ```
 
-Full API documentation: [pkg.go.dev](https://pkg.go.dev/github.com/libbusinessid/businessid-go).
+Full API documentation: [pkg.go.dev](https://pkg.go.dev/github.com/entid-org/entid-go).
 
 Every identifier shown in this README and in the runnable examples is a value the
 shared conformance corpus carries — `BE0123456749` under `vat-be-valid-001`,
@@ -81,9 +81,9 @@ rejects on anything other than `Valid` rejects every German VAT number there is.
 
 ```go
 switch report.Checksum.Status {
-case businessid.Valid:
+case entid.Valid:
     // The check digit holds.
-case businessid.Invalid:
+case entid.Invalid:
     // A documented rule proved this value wrong. Safe to reject.
 default:
     // No verdict. Fall back to the format result, or to a register.
@@ -109,7 +109,7 @@ computed on a shape it was not designed for, so a format that did not hold
 leaves the checksum `NotRun`.
 
 ```go
-report, _ := engine.Validate(businessid.Input{Kind: "siren", Value: "0123"})
+report, _ := engine.Validate(entid.Input{Kind: "siren", Value: "0123"})
 
 report.Format.Status      // invalid
 report.Format.Reason      // invalid_length
@@ -118,7 +118,7 @@ report.Checksum.Status    // not_run
 report.Checksum.Reason    // not_run_format_invalid
 ```
 
-`Reason` is a frozen registry every LibBusinessID engine agrees on — branch on
+`Reason` is a frozen registry every EntID engine agrees on — branch on
 it, not on a message. `MessageKey` names an entry in *your* catalogue, for the
 rules that declare one, so a user-facing message can be translated without
 parsing anything.
@@ -130,16 +130,16 @@ contradicts one that carries a different country.
 
 ```go
 // Without a prefix, the hint selects the definition.
-engine.Validate(businessid.Input{Kind: "vat", Value: "0123456749", CountryCode: "BE"})
+engine.Validate(entid.Input{Kind: "vat", Value: "0123456749", CountryCode: "BE"})
 // → BE0123456749, valid
 
 // Without either, nothing can be selected.
-engine.Validate(businessid.Input{Kind: "vat", Value: "0123456749"})
+engine.Validate(entid.Input{Kind: "vat", Value: "0123456749"})
 // → unsupported, missing_country_code
 
 // A hint that contradicts the prefix is the one dispatch failure that
 // proves an invalidity.
-engine.Validate(businessid.Input{Kind: "vat", Value: "BE0123456749", CountryCode: "FR"})
+engine.Validate(entid.Input{Kind: "vat", Value: "BE0123456749", CountryCode: "FR"})
 // → invalid, country_mismatch
 ```
 
@@ -151,10 +151,10 @@ opt-in and accepts only variants that are currently issued. Neither changes the
 canonical form.
 
 ```go
-in := businessid.Input{Kind: "vat", Value: "FRK7012345674"}
+in := entid.Input{Kind: "vat", Value: "FRK7012345674"}
 
 engine.Validate(in)             // valid: the computation key may be alphanumeric
-in.Profile = businessid.StrictCurrent
+in.Profile = entid.StrictCurrent
 engine.Validate(in)             // invalid: strict_current wants a numeric key
 ```
 
@@ -238,16 +238,16 @@ Run them yourself with `go test -bench . -benchmem`.
 The engine does not interpret a rule bundle. The work splits in two:
 
 ```
-spec/businessid-rules.binpb        the attested artifact
+spec/entid-rules.binpb             the attested artifact
         │
         ▼
-cmd/businessid-gen                 the generator: validates, then emits Go
+cmd/entid-gen                      the generator: validates, then emits Go
         │
         ▼
 rules_gen.go                       generated, committed, reviewable in a diff
         │
         ▼
-internal/runtime + the public API   what ships
+internal/runtime + the public API  what ships
 ```
 
 `rules.lock` is the only coupling point with the spec repository: it names a
@@ -283,12 +283,12 @@ the only program reading expected results; this repository provides the testee
 it drives, over the protocol of `spec/testee.proto`:
 
 ```sh
-go build -o bin/businessid-testee ./cmd/businessid-testee
+go build -o bin/entid-testee ./cmd/entid-testee
 
 # from the spec repository
 go run ./cmd/conformance-runner \
-    --corpus dist/businessid-conformance-2026.08.22.binpb \
-    -- /path/to/businessid-testee
+    --corpus dist/entid-conformance-2026.08.22.binpb \
+    -- /path/to/entid-testee
 ```
 
 ```
@@ -314,14 +314,14 @@ sources and how to read them.
 
 | Path | Role |
 |---|---|
-| `businessid.go`, `result.go` | the public API |
+| `entid.go`, `result.go` | the public API |
 | `engine.go` | dispatch and the validation pipeline, independent of the rules |
 | `rules_gen.go` | the compiled rules — generated, do not edit |
 | `internal/runtime` | the support primitives the generated code calls |
 | `internal/gen` | the generator: decoder, IR validation, Go emission |
-| `cmd/businessid-gen` | the generator command |
-| `cmd/businessid-testee` | the conformance protocol adapter |
-| `cmd/businessid-demo` | a one-shot command line check |
+| `cmd/entid-gen` | the generator command |
+| `cmd/entid-testee` | the conformance protocol adapter |
+| `cmd/entid-demo` | a one-shot command line check |
 | `spec/` | artifacts copied from the spec repository; never edited here |
 
 ## License

@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package gen_test
@@ -50,7 +50,7 @@ type loadFixture struct {
 // error, which section 8.8 addresses to the generator.
 func loadFixtures(t *testing.T) []loadFixture {
 	t.Helper()
-	raw := readSpecFile(t, "businessid-conformance.binpb")
+	raw := readSpecFile(t, "entid-conformance.binpb")
 
 	var out []loadFixture
 	walkFields(raw, func(field, wire int, payload []byte, _ uint64) {

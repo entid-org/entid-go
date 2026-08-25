@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package gen_test
@@ -12,18 +12,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/libbusinessid/businessid-go/internal/gen"
+	"github.com/entid-org/entid-go/internal/gen"
 )
 
 // TestGeneratedFileIsUpToDate is the guard that makes committing generated code
 // safe: it regenerates from the bundle and compares with what the repository
 // carries. A rules.lock bump that nobody regenerated fails here.
 func TestGeneratedFileIsUpToDate(t *testing.T) {
-	bundle, err := gen.Load(readSpecFile(t, "businessid-rules.binpb"))
+	bundle, err := gen.Load(readSpecFile(t, "entid-rules.binpb"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := gen.Generate(bundle, "businessid")
+	fresh, err := gen.Generate(bundle, "entid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,14 +41,14 @@ func TestGeneratedFileIsUpToDate(t *testing.T) {
 // TestGenerationIsDeterministic checks that the same bundle always produces the
 // same bytes, which is what makes a regeneration readable as a diff.
 func TestGenerationIsDeterministic(t *testing.T) {
-	raw := readSpecFile(t, "businessid-rules.binpb")
+	raw := readSpecFile(t, "entid-rules.binpb")
 	var first []byte
 	for range 3 {
 		bundle, err := gen.Load(raw)
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := gen.Generate(bundle, "businessid")
+		got, err := gen.Generate(bundle, "entid")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,11 +66,11 @@ func TestGenerationIsDeterministic(t *testing.T) {
 // one canonicalizer, one format rule and one checksum rule per definition, plus
 // the routing tables.
 func TestGeneratedCodeCoversEveryRule(t *testing.T) {
-	bundle, err := gen.Load(readSpecFile(t, "businessid-rules.binpb"))
+	bundle, err := gen.Load(readSpecFile(t, "entid-rules.binpb"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := gen.Generate(bundle, "businessid")
+	src, err := gen.Generate(bundle, "entid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,11 +137,11 @@ func TestGeneratedCodeCoversEveryRule(t *testing.T) {
 func TestGenerateRefusesAnOversizedCanonicalizer(t *testing.T) {
 	// The check lives in the generator, and the shipped bundle is far below
 	// the margin, so this asserts the headroom rather than the refusal itself.
-	bundle, err := gen.Load(readSpecFile(t, "businessid-rules.binpb"))
+	bundle, err := gen.Load(readSpecFile(t, "entid-rules.binpb"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := gen.Generate(bundle, "businessid"); err != nil {
+	if _, err := gen.Generate(bundle, "entid"); err != nil {
 		t.Fatalf("the shipped bundle must fit the workspace: %v", err)
 	}
 }
@@ -151,11 +151,11 @@ func TestGenerateRefusesAnOversizedCanonicalizer(t *testing.T) {
 // staticcheck skips files marked as generated, so an unused function would
 // otherwise ship unnoticed — dead weight in every binary that links the engine.
 func TestGeneratedCodeHasNoDeadFunction(t *testing.T) {
-	bundle, err := gen.Load(readSpecFile(t, "businessid-rules.binpb"))
+	bundle, err := gen.Load(readSpecFile(t, "entid-rules.binpb"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := gen.Generate(bundle, "businessid")
+	src, err := gen.Generate(bundle, "entid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestGeneratedCodeHasNoDeadFunction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	public, err := os.ReadFile(filepath.Join("..", "..", "businessid.go"))
+	public, err := os.ReadFile(filepath.Join("..", "..", "entid.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,11 +229,11 @@ func TestRulesVersionShape(t *testing.T) {
 // list: a variadic call written out at the call site rebuilds the whole slice
 // on every validation, which is linear work before a single comparison.
 func TestMembershipTestsAreSearchedNotScanned(t *testing.T) {
-	bundle, err := gen.Load(readSpecFile(t, "businessid-rules.binpb"))
+	bundle, err := gen.Load(readSpecFile(t, "entid-rules.binpb"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := gen.Generate(bundle, "businessid")
+	src, err := gen.Generate(bundle, "entid")
 	if err != nil {
 		t.Fatal(err)
 	}

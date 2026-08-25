@@ -1,14 +1,14 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package businessid_test
+package entid_test
 
 import (
 	"strings"
 	"testing"
 	"unicode/utf8"
 
-	businessid "github.com/libbusinessid/businessid-go"
+	entid "github.com/entid-org/entid-go"
 )
 
 // FuzzValidate drives arbitrary caller input through the public API.
@@ -34,11 +34,11 @@ func FuzzValidate(f *testing.F) {
 		f.Add(s.kind, s.value, s.country, s.profile)
 	}
 
-	engine := businessid.New()
+	engine := entid.New()
 	f.Fuzz(func(t *testing.T, kind, value, country, profile string) {
-		in := businessid.Input{
+		in := entid.Input{
 			Kind: kind, Value: value, CountryCode: country,
-			Profile: businessid.Profile(profile),
+			Profile: entid.Profile(profile),
 		}
 
 		report, err := engine.Validate(in)
@@ -54,22 +54,22 @@ func FuzzValidate(f *testing.F) {
 		if report.Input != value {
 			t.Fatalf("the raw input must come back unchanged")
 		}
-		if report.Format.Level != businessid.LevelFormat {
+		if report.Format.Level != entid.LevelFormat {
 			t.Fatalf("the format step must report the format level")
 		}
-		if report.Checksum.Level != businessid.LevelChecksum {
+		if report.Checksum.Level != entid.LevelChecksum {
 			t.Fatalf("the checksum step must report the checksum level")
 		}
-		if report.Format.Status == businessid.Unspecified || report.Checksum.Status == businessid.Unspecified {
+		if report.Format.Status == entid.Unspecified || report.Checksum.Status == entid.Unspecified {
 			t.Fatalf("a step must always carry a status")
 		}
 		// A checksum only runs behind a valid format, so it is never computed
 		// on a shape the rule was not designed for.
-		if report.Format.Status != businessid.Valid && report.Checksum.Status != businessid.NotRun {
+		if report.Format.Status != entid.Valid && report.Checksum.Status != entid.NotRun {
 			t.Fatalf("checksum %s ran behind format %s", report.Checksum.Status, report.Format.Status)
 		}
 		// Only a rule assertion carries a message key.
-		if report.Format.Status == businessid.Valid && report.Format.MessageKey != "" {
+		if report.Format.Status == entid.Valid && report.Format.MessageKey != "" {
 			t.Fatalf("a valid format must carry no message key")
 		}
 		assertReason(t, "format", report.Format)
@@ -97,8 +97,8 @@ func FuzzValidate(f *testing.F) {
 		if format.Format != report.Format {
 			t.Fatalf("ValidateFormat and Validate disagree on the format step")
 		}
-		if format.Format.Status == businessid.Valid &&
-			(format.Checksum.Status != businessid.NotRun || format.Checksum.Reason != businessid.ReasonNotRequested) {
+		if format.Format.Status == entid.Valid &&
+			(format.Checksum.Status != entid.NotRun || format.Checksum.Reason != entid.ReasonNotRequested) {
 			t.Fatalf("ValidateFormat must report the checksum as not requested")
 		}
 
@@ -112,7 +112,7 @@ func FuzzValidate(f *testing.F) {
 		// step 1 of the dispatch it then runs, so a value that is both too long
 		// and malformed is refused for its length.
 		if !utf8.ValidString(value) && len(value) <= 1024 {
-			if report.Format.Reason != businessid.ReasonInvalidEncoding {
+			if report.Format.Reason != entid.ReasonInvalidEncoding {
 				t.Fatalf("malformed UTF-8 must be refused with invalid_encoding, got %s",
 					report.Format.Reason)
 			}
@@ -124,15 +124,15 @@ func FuzzValidate(f *testing.F) {
 
 		// Canonicalization is idempotent over well formed input: running it on
 		// its own output changes nothing.
-		if canonical.Status == businessid.Valid {
-			again, err := engine.Canonicalize(businessid.Input{
+		if canonical.Status == entid.Valid {
+			again, err := engine.Canonicalize(entid.Input{
 				Kind: kind, Value: canonical.CanonicalValue,
-				CountryCode: country, Profile: businessid.Profile(profile),
+				CountryCode: country, Profile: entid.Profile(profile),
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if again.Status == businessid.Valid && again.CanonicalValue != canonical.CanonicalValue {
+			if again.Status == entid.Valid && again.CanonicalValue != canonical.CanonicalValue {
 				t.Fatalf("canonicalization is not idempotent: %q then %q",
 					canonical.CanonicalValue, again.CanonicalValue)
 			}
@@ -142,35 +142,35 @@ func FuzzValidate(f *testing.F) {
 
 // assertReason checks that a status only ever carries a reason the registry
 // allows it to carry.
-func assertReason(t *testing.T, name string, step businessid.Step) {
+func assertReason(t *testing.T, name string, step entid.Step) {
 	t.Helper()
 	switch step.Status {
-	case businessid.Valid:
-		if step.Reason != businessid.ReasonOK {
+	case entid.Valid:
+		if step.Reason != entid.ReasonOK {
 			t.Fatalf("%s: valid must carry ok, got %s", name, step.Reason)
 		}
-	case businessid.NotRun:
+	case entid.NotRun:
 		switch step.Reason {
-		case businessid.ReasonNotRequested,
-			businessid.ReasonNotRunFormatInvalid,
-			businessid.ReasonNotRunFormatUnsupported:
+		case entid.ReasonNotRequested,
+			entid.ReasonNotRunFormatInvalid,
+			entid.ReasonNotRunFormatUnsupported:
 		default:
 			t.Fatalf("%s: not_run cannot carry %s", name, step.Reason)
 		}
-	case businessid.Invalid:
+	case entid.Invalid:
 		// Invalid demands proof: only a documented, applicable rule produces it.
 		switch step.Reason {
-		case businessid.ReasonEmpty,
-			businessid.ReasonInvalidLength,
-			businessid.ReasonInvalidCharacters,
-			businessid.ReasonInvalidFormat,
-			businessid.ReasonInvalidChecksum,
-			businessid.ReasonCountryMismatch:
+		case entid.ReasonEmpty,
+			entid.ReasonInvalidLength,
+			entid.ReasonInvalidCharacters,
+			entid.ReasonInvalidFormat,
+			entid.ReasonInvalidChecksum,
+			entid.ReasonCountryMismatch:
 		default:
 			t.Fatalf("%s: invalid cannot carry %s", name, step.Reason)
 		}
-	case businessid.Unsupported:
-		if step.Reason == businessid.ReasonOK {
+	case entid.Unsupported:
+		if step.Reason == entid.ReasonOK {
 			t.Fatalf("%s: unsupported cannot carry ok", name)
 		}
 	}

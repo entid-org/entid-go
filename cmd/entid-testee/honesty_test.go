@@ -1,4 +1,4 @@
-// Copyright The LibBusinessID Authors.
+// Copyright The EntID Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -116,7 +116,7 @@ func closure(t *testing.T) []goPackage {
 		return filepath.Join(root, rel)
 	}
 
-	testee := module + "/cmd/businessid-testee"
+	testee := module + "/cmd/entid-testee"
 	queue := []string{testee}
 	done := map[string]bool{}
 	var out []goPackage
@@ -152,7 +152,7 @@ func TestTesteeNamesNoCorpus(t *testing.T) {
 	forbidden := []string{"corpus", "conformance", "binpb", "jsonl", "testdata", "expected"}
 	module := modulePath(t)
 	for _, pkg := range closure(t) {
-		if pkg.importPath != module+"/cmd/businessid-testee" {
+		if pkg.importPath != module+"/cmd/entid-testee" {
 			continue
 		}
 		for _, f := range pkg.files {
@@ -187,7 +187,7 @@ func TestTesteeReachesNoFileSystem(t *testing.T) {
 		"syscall": true, "plugin": true, "database/sql": true,
 	}
 	module := modulePath(t)
-	testee := module + "/cmd/businessid-testee"
+	testee := module + "/cmd/entid-testee"
 
 	for _, pkg := range closure(t) {
 		for _, imported := range pkg.imports {
@@ -300,7 +300,7 @@ func TestAnswerDoesNotDependOnTheCaseID(t *testing.T) {
 		"",
 		"siren-valid-001",
 		"loader-subject-node-circular-037",
-		"../../spec/businessid-conformance.binpb",
+		"../../spec/entid-conformance.binpb",
 		"\x00\x01\x02",
 		strings.Repeat("x", 4096),
 		"🙂 ni le cas ni son nom",
