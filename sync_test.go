@@ -298,6 +298,46 @@ func TestSyncWritesNothingWhenTheAttestationDoesNotVerify(t *testing.T) {
 	run.assertTreeUntouched(t)
 }
 
+// TestSyncAttestsEveryFileItCopies covers what section 11.4 step 3 added to the
+// list of files a synchronization writes: the prose contracts, spec.md,
+// engine.md and engine-go.md, "que la release publie et atteste au même titre
+// que les schémas". Those three carry no digest in the manifest, so unlike the
+// schemas nothing re-checks them afterwards — SHA256SUMS is all that stands
+// behind them, and SHA256SUMS is a file in the same release, which on its own
+// vouches for nobody. Attesting it is what makes every digest it lists worth
+// something, and therefore every file copied out of the release.
+func TestSyncAttestsEveryFileItCopies(t *testing.T) {
+	// The run stops later, on the incomplete manifest. What is asserted here is
+	// what it asked gh for before it got there.
+	run := runSync(t, "ok", true)
+	if run.err == nil {
+		t.Fatalf("this run is expected to stop on the manifest:\n%s%s", run.stdout, run.stderr)
+	}
+	var attested []string
+	for _, line := range strings.Split(run.log, "\n") {
+		if !strings.HasPrefix(line, "attestation verify ") {
+			continue
+		}
+		attested = append(attested, line)
+	}
+	if len(attested) == 0 {
+		t.Fatalf("the run asked for no attestation at all:\n%s", run.log)
+	}
+	for _, want := range []string{"SHA256SUMS", "-rules-", "-conformance-", "-manifest-"} {
+		found := false
+		for _, line := range attested {
+			if strings.Contains(line, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("nothing carrying %q had its attestation verified; the run asked for:\n%s",
+				want, strings.Join(attested, "\n"))
+		}
+	}
+}
+
 // The stub's manifest carries rulesVersion and nothing else, which is the shape
 // of the real one before spec#81: `jq -r` answers "null" for a field that is not
 // there, and "null" written into rules.lock is indistinguishable from a digest.
